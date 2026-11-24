@@ -10,8 +10,9 @@
     "keeper": "tsx src/keeper.ts",
     "relayer": "tsx src/relayer.ts",
     "snapshotter": "tsx src/snapshotter.ts",
+    "create-event": "tsx src/create-event.ts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@stocmoon/core": "workspace:*",

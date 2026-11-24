@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { MarketCard, StockRow } from "@/components/cards";
 import { EmptyState, StaleBanner } from "@/components/common";
 import { sessionAt, SESSION_LABELS } from "@stocmoon/core";
+import { useNow } from "@/hooks/useNow";
 
 const STEPS = [
   { n: "1", t: "Pick a stock", d: "Real Coinbase tokenized stocks on Base, with Chainlink reference prices." },
@@ -22,7 +23,8 @@ export default function Home() {
   const markets = useMarkets({ phase: "trading" });
   const live = stocks.data?.stocks.filter((s) => s.tradable) ?? [];
   const movers = [...(stocks.data?.stocks ?? [])].filter((s) => s.change24h !== null).sort((a, b) => Math.abs(b.change24h!) - Math.abs(a.change24h!)).slice(0, 6);
-  const session = sessionAt(Date.now());
+  const now = useNow(60_000);
+  const session = sessionAt(now);
 
   return (
     <div className="space-y-10">

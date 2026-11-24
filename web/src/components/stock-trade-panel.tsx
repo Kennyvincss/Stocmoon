@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Notice, TxStatusLine } from "@/components/common";
 import { MarketTrade } from "@/components/market-trade";
 import { useTradingAccess, EligibilityGate } from "@/components/eligibility";
+import { useNow } from "@/hooks/useNow";
 
 export function StockTradePanel({ stock, markets }: { stock: StockView; markets: MarketView[] }) {
   const cfg = useConfig();
@@ -88,7 +89,7 @@ function NoMarket({ stock, duration, openCreation, minLiquidity }: { stock: Stoc
     address: publicEnv.usdc, abi: erc20Abi, functionName: "allowance", args: address && publicEnv.markets ? [address, publicEnv.markets] : undefined,
     query: { enabled: Boolean(address) },
   });
-  const now = Date.now();
+  const now = useNow(30_000);
   const closeOk = isFeedSessionOpen(now) && isFeedSessionOpen(now + duration * 1000);
   const next = nextSessionOpen(now);
   const label = DURATION_LABELS[duration] ?? `${duration}s`;

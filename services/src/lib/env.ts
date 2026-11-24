@@ -72,4 +72,8 @@ export async function loop(service: string, intervalMs: number, tick: () => Prom
     if (once) break;
     await sleep(Math.max(1_000, intervalMs - (Date.now() - started)));
   } while (!stop);
+  // release DB pools / sockets so one-shot runs exit
+  const { closeDb } = await import("./db");
+  await closeDb();
+  process.exit(process.exitCode ?? 0);
 }

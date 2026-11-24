@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { AreaSeries, ColorType, createChart, type IChartApi, type ISeriesApi, type UTCTimestamp } from "lightweight-charts";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AreaSeries, ColorType, createChart, type IChartApi, type IPriceLine, type ISeriesApi, type UTCTimestamp } from "lightweight-charts";
 import { useHistory } from "@/lib/api";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -19,9 +19,10 @@ export function PriceChart({ address, openPrice }: { address: string; openPrice?
   const el = useRef<HTMLDivElement>(null);
   const chart = useRef<IChartApi | null>(null);
   const series = useRef<ISeriesApi<"Area"> | null>(null);
+  const entryLine = useRef<IPriceLine | null>(null);
   const { theme } = useTheme();
 
-  const points = q.data?.points ?? [];
+  const points = useMemo(() => q.data?.points ?? [], [q.data]);
   const first = points[0]?.value;
   const last = points[points.length - 1]?.value;
   const up = first !== undefined && last !== undefined ? last >= first : true;
@@ -44,6 +45,7 @@ export function PriceChart({ address, openPrice }: { address: string; openPrice?
       c.remove();
       chart.current = null;
       series.current = null;
+      entryLine.current = null;
     };
   }, []);
 
@@ -58,8 +60,12 @@ export function PriceChart({ address, openPrice }: { address: string; openPrice?
     const dedup = new Map<number, number>();
     for (const p of points) dedup.set(p.time, p.value);
     series.current.setData([...dedup.entries()].sort((a, b) => a[0] - b[0]).map(([time, value]) => ({ time: time as UTCTimestamp, value })));
+    if (entryLine.current) {
+      series.current.removePriceLine(entryLine.current);
+      entryLine.current = null;
+    }
     if (openPrice) {
-      series.current.createPriceLine({ price: openPrice, color: cssVar("--muted"), lineStyle: 2, lineWidth: 1, axisLabelVisible: true, title: "entry" });
+      entryLine.current = series.current.createPriceLine({ price: openPrice, color: cssVar("--muted"), lineStyle: 2, lineWidth: 1, axisLabelVisible: true, title: "entry" });
     }
     chart.current?.timeScale().fitContent();
   }, [points, openPrice]);

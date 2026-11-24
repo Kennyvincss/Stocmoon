@@ -5,7 +5,7 @@ import { ArrowLeft, ExternalLink } from "lucide-react";
 import { explorerAddress, feedToNumber, sideLabels } from "@stocmoon/core";
 import { useMarket } from "@/lib/api";
 import { publicEnv } from "@/lib/public-env";
-import { fmtDateTime, fmtDuration, fmtUsd, fmtUsdc, shortAddr } from "@/lib/format";
+import { fmtDateTime, fmtDuration, fmtShares, fmtUsd, fmtUsdc, shortAddr } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState, Stat, StockLogo, TxLink } from "@/components/common";
@@ -38,7 +38,7 @@ export function MarketDetail({ id }: { id: number }) {
         <ArrowLeft className="h-4 w-4" /> Back
       </Link>
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
-        <div className="space-y-6">
+        <div className="space-y-6 lg:col-start-1">
           <div className="flex items-start gap-3">
             <div className="flex -space-x-3">
               <StockLogo src={a?.iconUrl} symbol={a?.symbol ?? "?"} size={48} className="ring-2 ring-bg" />
@@ -61,12 +61,19 @@ export function MarketDetail({ id }: { id: number }) {
               {m.kind === "BATTLE" && <Stat label={`${b?.symbol} close`} value={px(m.closePriceB, dB)}
                 sub={ret(m.openPriceB, m.closePriceB) !== null ? `${(ret(m.openPriceB, m.closePriceB)! * 100).toFixed(2)}%` : undefined} />}
               <Stat label="Total locked" value={fmtUsdc(m.collateral)} />
-              <Stat label="Pool depth" value={`${fmtUsdc(m.poolYes)} / ${fmtUsdc(m.poolNo)}`} sub={`${labels.yes} / ${labels.no} shares in AMM`} />
+              <Stat label="Pool depth" value={`${fmtShares(m.poolYes)} / ${fmtShares(m.poolNo)}`} sub={`${labels.yes} / ${labels.no} shares in AMM`} />
               <Stat label="Participants" value={participants ?? "—"} sub={participants === null ? "needs indexer" : undefined} />
               <Stat label="Outcome" value={m.outcome === "NONE" ? "Pending" : m.outcome === "YES" ? labels.yes : m.outcome === "NO" ? labels.no : m.outcome} />
             </div>
           </CardContent></Card>
+        </div>
 
+        <div className="space-y-4 lg:sticky lg:top-20 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-start">
+          {m.phase === "trading" && <Card><CardContent><MarketTrade market={m} /></CardContent></Card>}
+          <Card><CardHeader><CardTitle>Your position</CardTitle></CardHeader><CardContent><PositionActions market={m} /></CardContent></Card>
+        </div>
+
+        <div className="space-y-6 lg:col-start-1">
           <Card>
             <CardHeader><CardTitle>Settlement rules (fixed at creation)</CardTitle></CardHeader>
             <CardContent className="space-y-3 text-sm leading-relaxed">
@@ -111,11 +118,6 @@ export function MarketDetail({ id }: { id: number }) {
               )}
             </CardContent>
           </Card>
-        </div>
-
-        <div className="space-y-4 lg:sticky lg:top-20 lg:self-start">
-          {m.phase === "trading" && <Card><CardContent><MarketTrade market={m} /></CardContent></Card>}
-          <Card><CardHeader><CardTitle>Your position</CardTitle></CardHeader><CardContent><PositionActions market={m} /></CardContent></Card>
         </div>
       </div>
     </div>

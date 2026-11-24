@@ -16,14 +16,6 @@ create table if not exists users (
   updated_at     timestamptz not null default now()
 );
 
-create table if not exists user_preferences (
-  address        text primary key references users(address) on delete cascade,
-  default_amount numeric(20, 6),
-  default_duration integer,
-  hide_balances  boolean not null default false,
-  updated_at     timestamptz not null default now()
-);
-
 create table if not exists eligibility_attestations (
   id             bigserial primary key,
   address        text not null,
@@ -220,21 +212,6 @@ create table if not exists positions (
   lp_shares       numeric not null default 0,
   updated_block   bigint not null,
   primary key (chain_id, market_id, account)
-);
-
-create table if not exists leaderboard_records (
-  chain_id          integer not null,
-  period            text not null check (period in ('daily', 'weekly', 'monthly', 'all')),
-  period_start      timestamptz not null,
-  account           text not null,
-  resolved_markets  integer not null,
-  correct           integer not null,
-  incorrect         integer not null,
-  volume            numeric not null,
-  realized_pnl      numeric not null,
-  accuracy          numeric,
-  computed_at       timestamptz not null default now(),
-  primary key (chain_id, period, period_start, account)
 );
 
 create table if not exists indexer_state (

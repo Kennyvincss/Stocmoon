@@ -10,6 +10,7 @@ import { fmtDuration, fmtShares, fmtUsdc } from "@/lib/format";
 import { useTx } from "@/hooks/useTx";
 import { Button } from "@/components/ui/button";
 import { Notice, TxStatusLine } from "@/components/common";
+import { useNow } from "@/hooks/useNow";
 
 interface Proof {
   roundA: string;
@@ -23,6 +24,7 @@ interface Proof {
 export function PositionActions({ market }: { market: MarketView }) {
   const { address } = useAccount();
   const tx = useTx();
+  const nowMs = useNow(5_000);
   const [proofError, setProofError] = useState<string | null>(null);
   const id = BigInt(market.id);
   const labels = sideLabels(market.kind, market.assetMetaA?.symbol, market.assetMetaB?.symbol);
@@ -80,13 +82,17 @@ export function PositionActions({ market }: { market: MarketView }) {
     }
   }
 
-  const now = Math.floor(Date.now() / 1000);
+  const now = Math.floor(nowMs / 1000);
   const hasShares = yes > 0n || no > 0n;
   const payout = payoutFor(market.outcome, yes, no);
 
+  if (!address) return <p className="text-sm text-muted">Connect a wallet to see and manage your position.</p>;
   return (
     <div className="space-y-3">
-      {address && (hasShares || lp > 0n) && (
+      {!hasShares && lp === 0n && fees === 0n && !["settling", "expired", "proposed"].includes(market.phase) && (
+        <p className="text-sm text-muted">You have no position in this market.</p>
+      )}
+      {(hasShares || lp > 0n) && (
         <div className="grid grid-cols-3 gap-2 rounded-xl bg-surface-2 p-3 text-sm">
           <div><div className="text-xs text-muted">{labels.yes} shares</div><div className="tabular font-medium">{fmtShares(yes)}</div></div>
           <div><div className="text-xs text-muted">{labels.no} shares</div><div className="tabular font-medium">{fmtShares(no)}</div></div>

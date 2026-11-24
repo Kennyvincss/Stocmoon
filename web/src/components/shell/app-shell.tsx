@@ -90,7 +90,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         {isTestnet && (
           <div className="border-b border-border bg-warn-soft px-4 py-2 text-center text-xs text-warn md:px-8">
-            Base Sepolia testnet. Test USDC and outcome shares have no monetary value. Reference prices are mirrored from Base mainnet Chainlink feeds.
+            {appChain.name} testnet. Test USDC and outcome shares have no monetary value. Reference prices are mirrored from Base mainnet Chainlink feeds.
           </div>
         )}
 

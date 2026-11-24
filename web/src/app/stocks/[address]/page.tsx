@@ -6,6 +6,7 @@ import { ArrowLeft, ExternalLink } from "lucide-react";
 import { explorerAddress, sessionAt, SESSION_LABELS, PAUSE_FEATURE_LABELS } from "@stocmoon/core";
 import { useStock } from "@/lib/api";
 import { publicEnv } from "@/lib/public-env";
+import { useNow } from "@/hooks/useNow";
 import { fmtAgo, fmtUsd } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,6 +19,7 @@ import { MarketCard } from "@/components/cards";
 export default function StockPage({ params }: { params: Promise<{ address: string }> }) {
   const { address } = use(params);
   const q = useStock(address);
+  const now = useNow(60_000);
 
   if (q.isLoading) {
     return <div className="grid gap-6 lg:grid-cols-[1fr_380px]"><Skeleton className="h-[480px]" /><Skeleton className="h-[560px]" /></div>;
@@ -29,7 +31,7 @@ export default function StockPage({ params }: { params: Promise<{ address: strin
   const { stock, meta, markets } = q.data;
   const price = stock.onchain.feedPrice ?? stock.navPrice;
   const priceTime = stock.onchain.feedUpdatedAt ? stock.onchain.feedUpdatedAt : stock.navUpdatedAt;
-  const session = sessionAt(Date.now());
+  const session = sessionAt(now);
   const others = markets.filter((m) => m.kind !== "UP_DOWN" || m.phase !== "trading");
   const openUpDown = markets.find((m) => m.kind === "UP_DOWN" && m.phase === "trading");
   const entry = openUpDown && stock.onchain.decimals != null ? Number(BigInt(openUpDown.openPriceA)) / 10 ** stock.onchain.decimals : null;
@@ -39,7 +41,7 @@ export default function StockPage({ params }: { params: Promise<{ address: strin
       <Link href="/markets" className="inline-flex items-center gap-1 text-sm text-muted hover:text-text"><ArrowLeft className="h-4 w-4" /> Markets</Link>
       <StaleBanner source={meta.source} fetchedAt={meta.fetchedAt} error={meta.error} />
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
-        <div className="space-y-6">
+        <div className="space-y-6 lg:col-start-1">
           <div className="flex items-start gap-4">
             <StockLogo src={stock.iconUrl} symbol={stock.symbol} size={52} />
             <div className="min-w-0 flex-1">
@@ -60,6 +62,14 @@ export default function StockPage({ params }: { params: Promise<{ address: strin
           </div>
 
           <Card><CardContent><PriceChart address={stock.address} openPrice={entry} /></CardContent></Card>
+        </div>
+
+        {/* on mobile the trade panel follows the chart; on desktop it is a sticky right column */}
+        <div className="lg:sticky lg:top-20 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-start">
+          <StockTradePanel stock={stock} markets={markets} />
+        </div>
+
+        <div className="space-y-6 lg:col-start-1">
 
           <Card>
             <CardHeader><CardTitle>About this token</CardTitle></CardHeader>
@@ -100,10 +110,6 @@ export default function StockPage({ params }: { params: Promise<{ address: strin
               <div className="grid gap-3 sm:grid-cols-2">{others.slice(0, 8).map((m) => <MarketCard key={m.id} market={m} />)}</div>
             </div>
           )}
-        </div>
-
-        <div className="lg:sticky lg:top-20 lg:self-start">
-          <StockTradePanel stock={stock} markets={markets} />
         </div>
       </div>
     </div>

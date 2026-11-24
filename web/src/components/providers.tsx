@@ -19,6 +19,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const saved = (typeof window !== "undefined" && localStorage.getItem("stocmoon-theme")) as Theme | null;
+    // restore the persisted preference after mount (reading it during render would break hydration)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (saved === "light" || saved === "dark") setTheme(saved);
   }, []);
   useEffect(() => {

@@ -106,7 +106,7 @@ export function MarketCard({ market }: { market: MarketView }) {
       </div>
       <OddsBar p={market.priceYes} yesLabel={labels.yes} noLabel={labels.no} />
       <div className="flex justify-between text-xs text-muted">
-        <span>Liquidity {fmtUsdc(market.collateral)}</span>
+        <span>Total locked {fmtUsdc(market.collateral)}</span>
         <span>Opened {fmtAgo(market.openTime)}</span>
       </div>
     </Link>

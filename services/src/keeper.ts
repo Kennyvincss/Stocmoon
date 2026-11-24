@@ -1,4 +1,4 @@
-import { erc20Abi, maxUint256, type Address } from "viem";
+import { erc20Abi, getAddress, maxUint256, type Address } from "viem";
 import {
   canScheduleMarket, findSettlementProof, normalizeMarket, oracleAdapterAbi, stocMoonLensAbi, stocMoonMarketsAbi,
   type MarketData, type RawMarket,
@@ -18,7 +18,7 @@ const DURATIONS = (optEnv("KEEPER_DURATIONS") ?? "3600,14400,86400").split(",").
 const LIQUIDITY = BigInt(env("KEEPER_LIQUIDITY", "50000000")); // 50 USDC
 const BATTLES = (optEnv("KEEPER_BATTLES") ?? "").split(",").filter(Boolean).map((s) => {
   const [a, b, dur] = s.split(":");
-  return { a: a as Address, b: b as Address, duration: Number(dur) };
+  return { a: getAddress(a!.toLowerCase()) as Address, b: getAddress(b!.toLowerCase()) as Address, duration: Number(dur) };
 });
 
 async function main() {
@@ -42,7 +42,8 @@ async function main() {
   }
 
   await loop("keeper", Number(env("KEEPER_INTERVAL_MS", "30000")), async () => {
-    const now = Math.floor(Date.now() / 1000);
+    // chain time is what the contract enforces
+    const now = Number((await client.getBlock()).timestamp);
     const count = Number(await client.readContract({ address: d.markets, abi: stocMoonMarketsAbi, functionName: "marketCount" }));
     const views = count
       ? ((await client.readContract({ address: d.lens, abi: stocMoonLensAbi, functionName: "listMarkets", args: [0n, 200n] })) as readonly {
@@ -94,7 +95,7 @@ async function main() {
         const [enabled] = await client.readContract({ address: d.markets, abi: stocMoonMarketsAbi, functionName: "durations", args: [duration] });
         if (!enabled) continue;
         if (open((m) => m.kind === "UP_DOWN" && m.assetA.toLowerCase() === asset.toLowerCase() && m.closeTime - m.openTime === duration)) continue;
-        if (!canScheduleMarket(Date.now(), (now + duration) * 1000)) continue;
+        if (!canScheduleMarket(now * 1000, (now + duration) * 1000)) continue;
         if (budget < LIQUIDITY) {
           log("keeper", "insufficient USDC for new market", { balance: budget });
           return;
@@ -106,8 +107,8 @@ async function main() {
     }
     for (const bt of BATTLES) {
       if (open((m) => m.kind === "BATTLE" && m.assetA.toLowerCase() === bt.a.toLowerCase() && m.assetB.toLowerCase() === bt.b.toLowerCase() && m.closeTime - m.openTime === bt.duration)) continue;
-      if (!canScheduleMarket(Date.now(), (now + bt.duration) * 1000) || budget < LIQUIDITY) continue;
-      if (await send("createBattleMarket", [bt.a, bt.b, bt.duration, LIQUIDITY]).catch(() => false)) budget -= LIQUIDITY;
+      if (!canScheduleMarket(now * 1000, (now + bt.duration) * 1000) || budget < LIQUIDITY) continue;
+      if (await send("createBattleMarket", [bt.a, bt.b, bt.duration, LIQUIDITY]).catch((e) => (log("keeper", "battle create failed", { error: (e as Error).message.slice(0, 200) }), false))) budget -= LIQUIDITY;
     }
   });
 }

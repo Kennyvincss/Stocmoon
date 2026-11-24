@@ -145,9 +145,9 @@ Price = Chainlink Total Return Value answer (per token, multiplier included), in
 
 ## Data model (PostgreSQL)
 
-`users, user_preferences, stocks, price_snapshots, markets, market_outcomes, positions, transactions,
-liquidity_pools, market_events, leaderboard_records, earnings_events, stock_battles, eligibility_attestations,
-indexer_state`. See `db/migrations/0001_init.sql`. Every chain-derived row stores `(tx_hash, log_index)`
+`users, stocks, api_sync_runs, price_snapshots, markets, market_outcomes, positions, transactions,
+liquidity_pools, market_events, earnings_events, stock_battles, eligibility_attestations, used_nonces,
+indexer_state, relayed_rounds`. The leaderboard is computed live from `transactions` + `markets` (no snapshot table). See `db/migrations/0001_init.sql`. Every chain-derived row stores `(tx_hash, log_index)`
 with a unique constraint, which makes the indexer idempotent (no duplicate processing).
 
 ## Leaderboard rules

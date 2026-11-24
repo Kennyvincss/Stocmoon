@@ -19,4 +19,5 @@ export const toClientEvmSigner = fail;
 export const toClientSvmSigner = fail;
 export const x402ResourceServer = fail;
 export const x402HTTPResourceServer = fail;
-export default {};
+const stub = {};
+export default stub;

@@ -18,7 +18,8 @@ const MAP: Record<string, string> = {
 };
 
 export function categoryFor(symbol: string): string {
-  const s = symbol.toUpperCase().replace(/[^A-Z]/g, "");
+  // Coinbase tokenized-stock tickers carry a lowercase "c" suffix (e.g. AAPLc -> AAPL)
+  const s = symbol.replace(/c$/, "").toUpperCase().replace(/[^A-Z]/g, "");
   return MAP[s] ?? MAP[s.replace(/^(CB|C|X)/, "")] ?? "Other";
 }
 

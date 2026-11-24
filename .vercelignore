@@ -1,0 +1,7 @@
+contracts/lib
+contracts/out
+contracts/cache
+contracts/broadcast
+**/node_modules
+**/.next
+.e2e

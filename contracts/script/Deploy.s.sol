@@ -70,6 +70,7 @@ contract Deploy is Script {
         markets.setDuration(4 hours, true, 15 minutes);
         markets.setDuration(1 days, true, 30 minutes);
         markets.setDuration(7 days, true, 2 hours);
+        markets.setDuration(30 days, true, 1 days);
         markets.setDuration(5 minutes, shortDurations, 1 minutes);
         markets.setDuration(15 minutes, shortDurations, 2 minutes);
         markets.setDuration(30 minutes, shortDurations, 3 minutes);

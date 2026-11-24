@@ -1,0 +1,23 @@
+{
+  "name": "stocmoon",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.28.0",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm --filter web build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test && pnpm contracts:test",
+    "lint": "pnpm --filter web lint",
+    "contracts:build": "cd contracts && forge build",
+    "contracts:test": "cd contracts && forge test",
+    "abi": "node packages/core/scripts/export-abi.mjs",
+    "assets:sync": "pnpm --filter services assets:sync",
+    "db:migrate": "pnpm --filter services db:migrate",
+    "indexer": "pnpm --filter services indexer",
+    "keeper": "pnpm --filter services keeper",
+    "relayer": "pnpm --filter services relayer",
+    "snapshotter": "pnpm --filter services snapshotter"
+  }
+}

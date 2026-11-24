@@ -1,0 +1,7 @@
+{
+  "_comment": "Chainlink tokenized-equity feed proxies on Base mainnet (8453) for Coinbase B20 stocks. Source: https://docs.base.org/base-chain/asset-issuance/tokenized-stocks-on-base and https://docs.chain.link/data-feeds/tokenized-equity-feeds/coinbase. Entries are UNVERIFIED until `pnpm assets:sync` checks them onchain. Add more feeds from the official tables; never guess an address.",
+  "feeds": [
+    { "symbol": "AAPL", "feed": "0x787f13dEa48Db0897CbCDD985de77809D837F988", "maxStaleness": 7200 },
+    { "symbol": "AMZN", "feed": "0x06A8E4b3aBB3B7543d8396FB2B763d22820cB295", "maxStaleness": 7200 }
+  ]
+}

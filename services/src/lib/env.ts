@@ -14,8 +14,12 @@ export function env(name: string, fallback?: string): string {
 export const optEnv = (name: string) => (process.env[name] ? process.env[name] : undefined);
 
 export function privateKey(name: string): Hex {
-  const v = env(name);
-  if (!/^0x[0-9a-fA-F]{64}$/.test(v)) throw new Error(`${name} is not a 32-byte hex private key`);
+  // tolerate keys pasted without the 0x prefix (MetaMask export) or with surrounding whitespace / quotes
+  let v = env(name).trim().replace(/^["']|["']$/g, "");
+  if (/^[0-9a-fA-F]{64}$/.test(v)) v = `0x${v}`;
+  if (!/^0x[0-9a-fA-F]{64}$/.test(v)) {
+    throw new Error(`${name} is not a 32-byte hex private key (got ${v.length} characters; expected 64 hex digits, optionally prefixed with 0x)`);
+  }
   return v as Hex;
 }
 

@@ -92,7 +92,9 @@ contract Deploy is Script {
         vm.serializeAddress(root, "lens", address(lens));
         vm.serializeUint(root, "deployBlock", block.number);
         string memory out = vm.serializeString(root, "feeds", feedsOut);
-        vm.writeJson(out, string.concat(vm.projectRoot(), "/deployments/", vm.toString(block.chainid), ".json"));
+        string memory dir = string.concat(vm.projectRoot(), "/deployments");
+        vm.createDir(dir, true);
+        vm.writeJson(out, string.concat(dir, "/", vm.toString(block.chainid), ".json"));
 
         console2.log("OracleAdapter  ", address(oracle));
         console2.log("StocMoonMarkets", address(markets));

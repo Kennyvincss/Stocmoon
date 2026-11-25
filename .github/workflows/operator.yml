@@ -25,7 +25,8 @@ jobs:
       KEEPER_PRIVATE_KEY: ${{ secrets.OPERATOR_PRIVATE_KEY }}
       # 10 test USDC of starting liquidity per market; limited to two stocks until the operator holds more USDC
       KEEPER_LIQUIDITY: "10000000"
-      KEEPER_DURATIONS: "86400"
+      # 24H markets plus 7D markets (24H markets cannot open when their close would fall on a weekend or holiday)
+      KEEPER_DURATIONS: "86400,604800"
       KEEPER_ASSETS: "0xb20000000000000000000078ee7ce2fE4908108C,0xb2000000000000000000001e800a7f5189430cD0"
     steps:
       - name: Check secret

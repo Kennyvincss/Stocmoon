@@ -1,0 +1,48 @@
+name: Operator (price relayer + market keeper)
+
+# Runs one relayer tick (mirror new Base mainnet Chainlink rounds to the Base Sepolia mirrors) and then one keeper
+# tick (open 24H markets during feed sessions, settle expired markets) every 5 minutes.
+# Requires the repository secret OPERATOR_PRIVATE_KEY (the operator wallet; never the admin wallet).
+# GitHub runs scheduled workflows from the default branch only.
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: operator
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CHAIN_ID: "84532"
+      RPC_URL: https://sepolia.base.org
+      MAINNET_RPC_URL: https://mainnet.base.org
+      RELAYER_PRIVATE_KEY: ${{ secrets.OPERATOR_PRIVATE_KEY }}
+      KEEPER_PRIVATE_KEY: ${{ secrets.OPERATOR_PRIVATE_KEY }}
+      # 10 test USDC of starting liquidity per market; limited to two stocks until the operator holds more USDC
+      KEEPER_LIQUIDITY: "10000000"
+      KEEPER_DURATIONS: "86400"
+      KEEPER_ASSETS: "0xb20000000000000000000078ee7ce2fE4908108C,0xb2000000000000000000001e800a7f5189430cD0"
+    steps:
+      - name: Check secret
+        run: |
+          if [ -z "$RELAYER_PRIVATE_KEY" ]; then echo "::warning::OPERATOR_PRIVATE_KEY secret not set; skipping"; echo "SKIP=1" >> "$GITHUB_ENV"; fi
+      - uses: actions/checkout@v4
+        if: env.SKIP != '1'
+      - uses: pnpm/action-setup@v4
+        if: env.SKIP != '1'
+      - uses: actions/setup-node@v4
+        if: env.SKIP != '1'
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile --filter services...
+        if: env.SKIP != '1'
+      - name: Relay prices
+        if: env.SKIP != '1'
+        run: pnpm --filter services exec tsx src/relayer.ts --once
+      - name: Keeper (create / settle markets)
+        if: env.SKIP != '1'
+        run: pnpm --filter services exec tsx src/keeper.ts --once

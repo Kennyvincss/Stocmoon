@@ -66,8 +66,11 @@ contract Deploy is Script {
             vm.serializeAddress(feedsJson, a.symbol, feed);
         }
 
-        markets.setDuration(1 hours, true, 5 minutes);
-        markets.setDuration(4 hours, true, 15 minutes);
+        // Chainlink Coinbase feeds update on 0.5% deviation or a 24h heartbeat, so intraday markets would often
+        // settle on the opening round (push). Intraday durations are opt-in.
+        bool intraday = vm.envOr("ENABLE_INTRADAY_DURATIONS", false);
+        markets.setDuration(1 hours, intraday, 5 minutes);
+        markets.setDuration(4 hours, intraday, 15 minutes);
         markets.setDuration(1 days, true, 30 minutes);
         markets.setDuration(7 days, true, 2 hours);
         markets.setDuration(30 days, true, 1 days);

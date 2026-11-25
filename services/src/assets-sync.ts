@@ -29,7 +29,8 @@ async function main() {
   const report: Record<string, unknown>[] = [];
 
   for (const f of feeds) {
-    const matches = api.stocks.filter((s) => s.symbol.toUpperCase() === f.symbol.toUpperCase());
+    // Coinbase API tickers carry a lowercase "c" suffix (AAPLc); Chainlink names use the plain ticker.
+    const matches = api.stocks.filter((s) => s.symbol.replace(/c$/, "").toUpperCase() === f.symbol.toUpperCase());
     if (matches.length !== 1) {
       report.push({ symbol: f.symbol, ok: false, reason: `${matches.length} API tokens match symbol` });
       continue;

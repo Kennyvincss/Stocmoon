@@ -14,7 +14,7 @@ import { appClient, walletFor } from "./lib/clients";
  *  - finalizes event-market proposals after the dispute window
  * The keeper has MARKET_CREATOR_ROLE only; it cannot change existing markets.
  */
-const DURATIONS = (optEnv("KEEPER_DURATIONS") ?? "3600,14400,86400").split(",").map(Number);
+const DURATIONS = (optEnv("KEEPER_DURATIONS") ?? "86400,604800").split(",").map(Number);
 const LIQUIDITY = BigInt(env("KEEPER_LIQUIDITY", "50000000")); // 50 USDC
 const BATTLES = (optEnv("KEEPER_BATTLES") ?? "").split(",").filter(Boolean).map((s) => {
   const [a, b, dur] = s.split(":");

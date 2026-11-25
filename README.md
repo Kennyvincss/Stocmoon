@@ -145,10 +145,12 @@ All inputs are validated (zod / address checks), routes are rate-limited per IP,
 - **Reference price ≠ execution price.** Settlement uses Chainlink's tokenized-equity Total Return Value.
 - **Market hours.** Feeds are 24/5 and freeze on weekends, holidays and corporate-action pauses. The keeper only opens
   markets that close inside a feed session; the contract's staleness bound is the hard guarantee (else INVALID).
-- **Short durations (5m/15m/30m) are disabled** until observed feed update frequency supports them (the relayer logs
-  source update intervals).
+- **Only 24H / 7D / 30D markets are enabled by default.** Chainlink's Coinbase feeds update on a 0.5% move or a 24h
+  heartbeat, so 1H/4H markets would usually settle on the opening round (push). Enable them with
+  `ENABLE_INTRADAY_DURATIONS=true` (and 5m–30m with `ENABLE_SHORT_DURATIONS=true`) only if that trade-off is acceptable.
 - **Testnet price mirror is a trust assumption** (relayer key). Every mirrored round is auditable against mainnet.
-- **Feed list is incomplete** — only feeds verified by `assets:sync` are deployed.
+- **13 stocks** have verified feeds (`contracts/config/assets.json`). COIN has a Chainlink feed but no token in the
+  Tokenized Stocks API; the 24/7 smoothed feeds are excluded because their off-hours methodology differs.
 - **Website gating isn't contract gating.** Enable `setEligibilityRequired(true)` to enforce eligibility onchain.
 - **Unaudited contracts**; LP withdrawals may return part of the position as outcome shares.
 - Pagination limit of the API isn't officially documented; the client uses `page_size=100` and follows cursors.

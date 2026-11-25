@@ -1,0 +1,8 @@
+packages:
+  - packages/*
+  - web
+  - services
+onlyBuiltDependencies:
+  - esbuild
+  - sharp
+  - unrs-resolver

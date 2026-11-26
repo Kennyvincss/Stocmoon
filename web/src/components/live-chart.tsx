@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { fmtUsd } from "@/lib/format";
 
 export interface LiveResponse {
-  source: "pyth" | "reference";
+  source: "alpaca" | "pyth" | "reference";
   session?: "regular" | "24/7";
   liveConfigured?: boolean;
   price: number | null;
@@ -145,7 +145,8 @@ export function LiveChart({
   const base = entry ?? candles[0]?.open ?? null;
   const change = price !== null && base ? price - base : null;
   const age = d?.time ? Math.floor(now / 1000) - d.time : null;
-  const isLive = d?.source === "pyth" && age !== null && age < 120;
+  const isLive = d?.source !== undefined && d.source !== "reference" && age !== null && age < 120;
+  const provider = d?.source === "alpaca" ? "Alpaca IEX" : "Pyth";
 
   return (
     <div className="space-y-4">
@@ -162,8 +163,8 @@ export function LiveChart({
             ) : null}
             <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs", isLive ? "bg-up-soft text-up" : "bg-surface-2 text-muted")}>
               <span className={cn("h-1.5 w-1.5 rounded-full", isLive ? "animate-pulse bg-up" : "bg-muted")} />
-              {d?.source === "pyth"
-                ? isLive ? (d.session === "24/7" ? "Live · 24/7 indicative (Pyth)" : "Live · Pyth") : "Market closed · last price"
+              {d && d.source !== "reference"
+                ? isLive ? (d.session === "24/7" ? `Live · 24/7 indicative (${provider})` : `Live · ${provider}`) : "Market closed · last trade"
                 : d?.liveConfigured === false ? "Reference price · live feed not configured" : "Reference price"}
             </span>
             {sentiment && (
@@ -189,8 +190,8 @@ export function LiveChart({
         )}
       </div>
       <p className="text-[11px] leading-relaxed text-muted">
-        {d?.source === "pyth"
-          ? "Live price: Pyth underlying share price × the token's multiplier. Display only — markets settle on the Chainlink reference price recorded onchain."
+        {d && d.source !== "reference"
+          ? `Live price: ${provider} share price × the token's multiplier. Display only — markets settle on the Chainlink reference price recorded onchain.`
           : "Showing the Chainlink reference price, which updates on 0.5% moves or every 24h. Second-by-second movement appears once a live feed is configured."}
       </p>
     </div>

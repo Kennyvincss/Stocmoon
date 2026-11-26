@@ -68,7 +68,7 @@ export function StockTradePanel({ stock, markets }: { stock: StockView; markets:
             <ul className="mt-1 list-disc pl-4 text-xs">{stock.reasons.map((r) => <li key={r}>{r}</li>)}</ul>
           </Notice>
         ) : market ? (
-          <MarketTrade market={market} currentPrice={stock.onchain.feedPrice ?? null} />
+          <MarketTrade market={market} currentPrice={market.currentPriceA ?? stock.onchain.feedPrice ?? null} />
         ) : selected ? (
           <NoMarket stock={stock} duration={selected} openCreation={cfg.data?.openCreation ?? false} minLiquidity={cfg.data?.minInitialLiquidity ?? "0"} />
         ) : (

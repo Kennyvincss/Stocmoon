@@ -84,7 +84,11 @@ export function MarketDetail({ id }: { id: number }) {
                 </>
               ) : (
                 <ol className="list-decimal space-y-1.5 pl-5">
-                  <li>Reference price: Chainlink tokenized-equity feed ({m.kind === "BATTLE" ? "both assets" : a?.symbol}), price per token including the issuer multiplier.</li>
+                  {a?.intraday ? (
+                    <li>Settlement price: {a.symbol} last-trade price from Alpaca (IEX), published onchain about every 30 seconds during US trading hours by the StocMoon operator. <b>Testnet trust assumption</b>: the operator is the price source for intraday markets (mainnet would use Pyth or Chainlink Data Streams).</li>
+                  ) : (
+                    <li>Reference price: Chainlink tokenized-equity feed ({m.kind === "BATTLE" ? "both assets" : a?.symbol}), price per token including the issuer multiplier.</li>
+                  )}
                   <li>Opening price recorded onchain at creation ({fmtDateTime(m.openTime)}).</li>
                   <li>Closing price = the feed round in effect at {fmtDateTime(m.closeTime)}, proved by round ids and verified by the contract. It must be no older than {fmtDuration(m.maxStaleness)}.</li>
                   {m.kind === "UP_DOWN"

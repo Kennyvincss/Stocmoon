@@ -1,6 +1,6 @@
 import { parseAbiItem, type Address } from "viem";
 import {
-  CANDIDATE_DURATIONS, findSettlementProof, normalizeMarket, marketPhase, stocMoonLensAbi, stocMoonMarketsAbi,
+  CANDIDATE_DURATIONS, findSettlementProof, intradayAssetId, normalizeMarket, marketPhase, stocMoonLensAbi, stocMoonMarketsAbi,
   type MarketData, type MarketPhase, type RawMarket,
 } from "@stocmoon/core";
 import { publicEnv } from "../public-env";
@@ -16,6 +16,8 @@ export interface AssetMeta {
   name: string;
   iconUrl: string | null;
   decimals: number | null;
+  /** True when this is a stock's intraday (5m–4H) settlement feed rather than its Chainlink feed. */
+  intraday?: boolean;
 }
 
 export interface MarketView extends MarketData {
@@ -25,6 +27,8 @@ export interface MarketView extends MarketData {
   assetMetaB: AssetMeta | null;
   question: string | null;
   rulesURI: string | null;
+  /** Latest price of asset A's settlement feed (display). */
+  currentPriceA: number | null;
 }
 
 export interface ProtocolConfig {
@@ -126,11 +130,20 @@ export async function listMarkets(filter: { kind?: string; asset?: string; phase
   const [markets, stocks, details] = await Promise.all([rawMarkets(), getStocks(), eventDetails()]);
   const registry: Map<string, OnchainAsset> = await onchainRegistry().catch(() => new Map());
   const meta = new Map<string, AssetMeta>();
+  const intradayOf = new Map<string, string>(); // pseudo asset -> token (lowercase)
   for (const s of stocks.stocks) {
     meta.set(s.address.toLowerCase(), {
       address: s.address, symbol: s.symbol, name: s.name, iconUrl: s.iconUrl,
       decimals: registry.get(s.address.toLowerCase())?.decimals ?? null,
     });
+    const pseudo = intradayAssetId(s.address).toLowerCase();
+    if (registry.has(pseudo)) {
+      intradayOf.set(pseudo, s.address.toLowerCase());
+      meta.set(pseudo, {
+        address: s.address, symbol: s.symbol, name: s.name, iconUrl: s.iconUrl,
+        decimals: registry.get(pseudo)?.decimals ?? null, intraday: true,
+      });
+    }
   }
   const metaFor = (a: Address): AssetMeta | null => {
     if (!a || /^0x0+$/.test(a)) return null;
@@ -149,9 +162,15 @@ export async function listMarkets(filter: { kind?: string; asset?: string; phase
       assetMetaB: m.kind === "BATTLE" ? metaFor(m.assetB) : null,
       question: details.get(m.id)?.question ?? null,
       rulesURI: details.get(m.id)?.rulesURI ?? null,
+      currentPriceA: registry.get(m.assetA.toLowerCase())?.feedPrice ?? null,
     }))
     .filter((m) => (!filter.kind || m.kind === filter.kind))
-    .filter((m) => (!filter.asset || m.assetA.toLowerCase() === filter.asset.toLowerCase() || m.assetB.toLowerCase() === filter.asset.toLowerCase()))
+    .filter((m) => {
+      if (!filter.asset) return true;
+      const want = filter.asset.toLowerCase();
+      const tokenA = intradayOf.get(m.assetA.toLowerCase()) ?? m.assetA.toLowerCase();
+      return tokenA === want || m.assetB.toLowerCase() === want;
+    })
     .filter((m) => (!filter.phase || m.phase === filter.phase));
 }
 

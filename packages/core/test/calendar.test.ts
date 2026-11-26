@@ -35,3 +35,21 @@ describe("feed session calendar", () => {
     expect(canScheduleMarket(fri3pm, fri3pm + 86_400_000)).toBe(false);
   });
 });
+
+import { canScheduleIntraday, isRegularSession } from "../src/calendar";
+import { intradayAssetId } from "../src/intraday";
+
+describe("intraday helpers", () => {
+  it("only schedules inside one regular session", () => {
+    const tue10 = Date.parse("2026-12-01T10:00:00-05:00");
+    expect(isRegularSession(tue10)).toBe(true);
+    expect(canScheduleIntraday(tue10, tue10 + 3600_000)).toBe(true);
+    expect(canScheduleIntraday(tue10, tue10 + 6 * 3600_000)).toBe(false); // past 16:00
+    expect(canScheduleIntraday(Date.parse("2026-12-01T08:00:00-05:00"), Date.parse("2026-12-01T08:05:00-05:00"))).toBe(false);
+  });
+  it("derives a stable pseudo asset id", () => {
+    const a = intradayAssetId("0xb20000000000000000000078ee7ce2fE4908108C");
+    expect(a).toMatch(/^0x[0-9a-fA-F]{40}$/);
+    expect(intradayAssetId("0xB20000000000000000000078EE7CE2FE4908108C".toLowerCase() as `0x${string}`)).toBe(a);
+  });
+});

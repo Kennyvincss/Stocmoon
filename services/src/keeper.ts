@@ -1,10 +1,11 @@
 import { erc20Abi, getAddress, maxUint256, type Address } from "viem";
 import {
-  canScheduleMarket, findSettlementProof, normalizeMarket, oracleAdapterAbi, stocMoonLensAbi, stocMoonMarketsAbi,
+  canScheduleMarket, findSettlementProof, mirrorAggregatorAbi, normalizeMarket, oracleAdapterAbi, stocMoonLensAbi, stocMoonMarketsAbi,
   type MarketData, type RawMarket,
 } from "@stocmoon/core";
 import { deployment, env, log, loop, optEnv, privateKey } from "./lib/env";
 import { appClient, walletFor } from "./lib/clients";
+import { recycleLiquidity } from "./lib/ops";
 
 /**
  * Keeper:
@@ -78,11 +79,21 @@ async function main() {
       }
     }
 
+    // ---- recycle seed liquidity from resolved markets back into the keeper's wallet
+    await recycleLiquidity(client, d.markets, me, markets, send);
+
     // ---- rolling market creation
     const balance = await client.readContract({ address: d.usdc, abi: erc20Abi, functionName: "balanceOf", args: [me] });
     const assetCount = await client.readContract({ address: d.oracleAdapter, abi: oracleAdapterAbi, functionName: "assetCount" });
     const assets: Address[] = [];
-    for (let i = 0n; i < assetCount; i++) assets.push(await client.readContract({ address: d.oracleAdapter, abi: oracleAdapterAbi, functionName: "assetAt", args: [i] }));
+    for (let i = 0n; i < assetCount; i++) {
+      const a = await client.readContract({ address: d.oracleAdapter, abi: oracleAdapterAbi, functionName: "assetAt", args: [i] });
+      // intraday pseudo assets (feeds without a mainnet source) are handled by the operator, not this keeper
+      const info = await client.readContract({ address: d.oracleAdapter, abi: oracleAdapterAbi, functionName: "getAsset", args: [a] });
+      const src = await client.readContract({ address: info.feed, abi: mirrorAggregatorAbi, functionName: "sourceFeed" }).catch(() => null);
+      if (src && /^0x0{40}$/i.test(src)) continue;
+      assets.push(a);
+    }
     const onlyAssets = optEnv("KEEPER_ASSETS")?.toLowerCase().split(",");
     let budget = balance;
 

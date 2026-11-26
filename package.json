@@ -18,6 +18,7 @@
     "indexer": "pnpm --filter services indexer",
     "keeper": "pnpm --filter services keeper",
     "relayer": "pnpm --filter services relayer",
-    "snapshotter": "pnpm --filter services snapshotter"
+    "snapshotter": "pnpm --filter services snapshotter",
+    "operator": "pnpm --filter services operator"
   }
 }

@@ -12,13 +12,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Change, EmptyState, StaleBanner, Stat, StockLogo } from "@/components/common";
-import { PriceChart } from "@/components/price-chart";
+import { LiveChart, useLivePrice } from "@/components/live-chart";
+import { LivePnl } from "@/components/live-pnl";
 import { StockTradePanel } from "@/components/stock-trade-panel";
 import { MarketCard } from "@/components/cards";
 
 export default function StockPage({ params }: { params: Promise<{ address: string }> }) {
   const { address } = use(params);
   const q = useStock(address);
+  const live = useLivePrice(address);
   const now = useNow(60_000);
 
   if (q.isLoading) {
@@ -34,6 +36,8 @@ export default function StockPage({ params }: { params: Promise<{ address: strin
   const session = sessionAt(now);
   const others = markets.filter((m) => m.kind !== "UP_DOWN" || m.phase !== "trading");
   const openUpDown = markets.find((m) => m.kind === "UP_DOWN" && m.phase === "trading");
+  const busiest = markets.filter((m) => m.kind === "UP_DOWN" && m.phase === "trading").sort((a, b) => Number(BigInt(b.collateral) - BigInt(a.collateral)))[0];
+  const sentiment = busiest ? { up: busiest.priceYes, label: "market odds" } : null;
   const entry = openUpDown && stock.onchain.decimals != null ? Number(BigInt(openUpDown.openPriceA)) / 10 ** stock.onchain.decimals : null;
 
   return (
@@ -43,30 +47,30 @@ export default function StockPage({ params }: { params: Promise<{ address: strin
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
         <div className="space-y-6 lg:col-start-1">
           <div className="flex items-start gap-4">
-            <StockLogo src={stock.iconUrl} symbol={stock.symbol} size={52} />
+            <StockLogo src={stock.iconUrl} symbol={stock.symbol} size={64} />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-2xl font-semibold tracking-tight">{stock.name}</h1>
                 <Badge>{stock.symbol}</Badge>
                 {stock.tradable ? <Badge tone="up">Tradable</Badge> : <Badge tone="warn">Not tradable</Badge>}
               </div>
-              <div className="mt-2 flex flex-wrap items-baseline gap-3">
-                <span className="tabular text-4xl font-semibold tracking-tight">{fmtUsd(price)}</span>
-                <Change value={stock.change24h} className="text-base" />
-                <span className="text-xs text-muted">24h</span>
-              </div>
-              <div className="mt-1 text-xs text-muted">
-                Reference price (NAV) · updated {fmtAgo(priceTime ?? null)} · {SESSION_LABELS[session]}
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted">
+                <span>Settlement reference <b className="tabular text-text">{fmtUsd(price)}</b></span>
+                <Change value={stock.change24h} />
+                <span>24h · updated {fmtAgo(priceTime ?? null)} · {SESSION_LABELS[session]}</span>
               </div>
             </div>
           </div>
 
-          <Card><CardContent><PriceChart address={stock.address} openPrice={entry} /></CardContent></Card>
+          <Card><CardContent><LiveChart address={stock.address} entry={entry} sentiment={sentiment} /></CardContent></Card>
         </div>
 
         {/* on mobile the trade panel follows the chart; on desktop it is a sticky right column */}
         <div className="lg:sticky lg:top-20 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-start">
-          <StockTradePanel stock={stock} markets={markets} />
+          <div className="space-y-4">
+            <LivePnl asset={stock.address} livePrice={live.data?.price ?? null} />
+            <StockTradePanel stock={stock} markets={markets} />
+          </div>
         </div>
 
         <div className="space-y-6 lg:col-start-1">

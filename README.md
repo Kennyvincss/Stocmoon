@@ -124,6 +124,7 @@ fixture tokens** (`FIXTA`, `FIXTB`, …) — never point a public deployment at 
 | web (public) | `NEXT_PUBLIC_CHAIN_ID`, `NEXT_PUBLIC_MARKETS_ADDRESS`, `NEXT_PUBLIC_LENS_ADDRESS`, `NEXT_PUBLIC_ORACLE_ADDRESS`, `NEXT_PUBLIC_USDC_ADDRESS` | Contracts (no secrets) |
 | web (public) | `NEXT_PUBLIC_RPC_URL`, `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`, `NEXT_PUBLIC_APP_URL` | Wallet transport, WalletConnect, share links |
 | web (server) | `RPC_URL`, `MAINNET_RPC_URL`, `DATABASE_URL`, `DEPLOY_BLOCK` | Reads, history, persistence |
+| web (server) | `PYTH_API_KEY` | Optional: live second-by-second chart prices (display only). Without it the chart shows the Chainlink reference price |
 | web (server) | `BLOCKED_COUNTRIES`, `ALLOW_UNKNOWN_COUNTRY`, `ELIGIBILITY_SIGNER_PRIVATE_KEY`, `IP_HASH_SALT` | Compliance |
 | services | `KEEPER_PRIVATE_KEY`, `RELAYER_PRIVATE_KEY`, `KEEPER_*`, `INDEXER_*`, `RELAYER_*` | See `services/.env.example` |
 | contracts | `ETHERSCAN_API_KEY`, `USDC_ADDRESS`, `KEEPER_ADDRESS`, `RELAYER_ADDRESS`, `ENABLE_SHORT_DURATIONS` | See `contracts/.env.example` |

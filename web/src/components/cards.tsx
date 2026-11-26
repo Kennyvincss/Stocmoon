@@ -15,7 +15,7 @@ export function StockCard({ stock, index = 0 }: { stock: StockView; index?: numb
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(index, 12) * 0.02 }}>
       <Link href={`/stocks/${stock.address}`}
         className="group flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 transition-colors hover:bg-surface-2">
-        <StockLogo src={stock.iconUrl} symbol={stock.symbol} />
+        <StockLogo src={stock.iconUrl} symbol={stock.symbol} size={44} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="font-semibold">{stock.symbol}</span>
@@ -92,8 +92,8 @@ export function MarketCard({ market }: { market: MarketView }) {
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
           <div className="flex -space-x-2">
-            <StockLogo src={a?.iconUrl} symbol={a?.symbol ?? "?"} size={32} className="ring-2 ring-surface" />
-            {b && <StockLogo src={b.iconUrl} symbol={b.symbol} size={32} className="ring-2 ring-surface" />}
+            <StockLogo src={a?.iconUrl} symbol={a?.symbol ?? "?"} size={44} className="ring-2 ring-surface" />
+            {b && <StockLogo src={b.iconUrl} symbol={b.symbol} size={44} className="ring-2 ring-surface" />}
           </div>
           <div className="min-w-0">
             <div className={cn("truncate font-medium", market.kind === "EVENT" && "text-sm")}>{title}</div>

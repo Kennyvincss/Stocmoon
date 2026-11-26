@@ -18,8 +18,10 @@ export function StockLogo({ src, symbol, size = 40, className }: { src?: string 
       </div>
     );
   }
+  // Coinbase serves icons as binary/octet-stream + nosniff, which Safari/iOS won't render: proxy them same-origin.
+  const url = /^https:\/\/metadata\.coinbase\.com\//.test(src) ? `/api/icon?src=${encodeURIComponent(src)}` : src;
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={src} alt="" style={style} onError={() => setFailed(true)} className={cn("shrink-0 rounded-full bg-surface-2 object-cover", className)} />;
+  return <img src={url} alt="" style={style} loading="lazy" decoding="async" onError={() => setFailed(true)} className={cn("shrink-0 rounded-full bg-surface-2 object-cover", className)} />;
 }
 
 export function Notice({ tone = "warn", children, className }: { tone?: "warn" | "down" | "neutral"; children: React.ReactNode; className?: string }) {

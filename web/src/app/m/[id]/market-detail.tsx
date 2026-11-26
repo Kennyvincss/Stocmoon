@@ -41,8 +41,8 @@ export function MarketDetail({ id }: { id: number }) {
         <div className="space-y-6 lg:col-start-1">
           <div className="flex items-start gap-3">
             <div className="flex -space-x-3">
-              <StockLogo src={a?.iconUrl} symbol={a?.symbol ?? "?"} size={48} className="ring-2 ring-bg" />
-              {b && <StockLogo src={b.iconUrl} symbol={b.symbol} size={48} className="ring-2 ring-bg" />}
+              <StockLogo src={a?.iconUrl} symbol={a?.symbol ?? "?"} size={64} className="ring-2 ring-bg" />
+              {b && <StockLogo src={b.iconUrl} symbol={b.symbol} size={64} className="ring-2 ring-bg" />}
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-semibold tracking-tight">{title}</h1><PhaseBadge market={m} /></div>

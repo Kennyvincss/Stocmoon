@@ -9,16 +9,51 @@ import { serverEnv } from "./env";
 const HERMES = process.env.PYTH_HERMES_URL || "https://hermes.pyth.network";
 
 export interface LiveQuote {
+  provider: "alpaca" | "pyth";
   /** Underlying share price in USD. */
   price: number;
-  /** Unix seconds of the publisher update. */
+  /** Unix seconds of the publisher update / trade. */
   publishTime: number;
-  /** "Equity.US.NVDA/USD" (regular hours) or "Equity.Index.NVDA/USD" (24/7 indicative). */
+  /** Provider symbol, e.g. "NVDA (IEX)" or "Equity.US.NVDA/USD". */
   symbol: string;
   session: "regular" | "24/7";
 }
 
 export const pythConfigured = () => Boolean(process.env.PYTH_API_KEY);
+export const alpacaConfigured = () => Boolean(process.env.ALPACA_API_KEY_ID && process.env.ALPACA_API_SECRET);
+export const liveConfigured = () => alpacaConfigured() || pythConfigured();
+
+const ALPACA_DATA = process.env.ALPACA_DATA_URL || "https://data.alpaca.markets";
+const ALPACA_FEED = process.env.ALPACA_FEED || "iex"; // free Basic plan = IEX real-time
+
+/**
+ * Alpaca latest trade (free Basic plan: real-time IEX trades). Keys are server-side only.
+ * GET /v2/stocks/trades/latest?symbols=NVDA&feed=iex  -> { trades: { NVDA: { p, t } } }
+ */
+async function alpacaQuote(ticker: string): Promise<LiveQuote | null> {
+  const r = await cached(`alpaca:${ticker}`, 1_000, async () => {
+    const url = `${ALPACA_DATA}/v2/stocks/trades/latest?symbols=${encodeURIComponent(ticker)}&feed=${ALPACA_FEED}`;
+    const res = await fetch(url, {
+      headers: { "APCA-API-KEY-ID": process.env.ALPACA_API_KEY_ID!, "APCA-API-SECRET-KEY": process.env.ALPACA_API_SECRET! },
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!res.ok) throw new Error(`alpaca HTTP ${res.status}`);
+    const body = (await res.json()) as { trades?: Record<string, { p?: number; t?: string }> };
+    return body.trades?.[ticker] ?? null;
+  });
+  const t = r.value;
+  if (!t?.p || !(t.p > 0) || !t.t) return null;
+  return { provider: "alpaca", price: t.p, publishTime: Math.floor(Date.parse(t.t) / 1000), symbol: `${ticker} (${ALPACA_FEED.toUpperCase()})`, session: "regular" };
+}
+
+/** Live quote from the configured provider (Alpaca preferred, then Pyth). Null when none is configured. */
+export async function liveQuote(ticker: string): Promise<LiveQuote | null> {
+  if (alpacaConfigured()) {
+    const q = await alpacaQuote(ticker).catch(() => null);
+    if (q) return q;
+  }
+  return pythQuote(ticker);
+}
 
 function headers(): HeadersInit {
   return process.env.PYTH_API_KEY ? { authorization: `Bearer ${process.env.PYTH_API_KEY}` } : {};
@@ -42,8 +77,8 @@ interface ParsedPrice {
   price: { price: string; expo: number; publish_time: number };
 }
 
-/** Latest live quote: the regular-hours feed if it is fresh (< 60s), otherwise the 24/7 feed. */
-export async function liveQuote(ticker: string): Promise<LiveQuote | null> {
+/** Pyth: the regular-hours feed if it is fresh (< 60s), otherwise the 24/7 feed. */
+async function pythQuote(ticker: string): Promise<LiveQuote | null> {
   if (!pythConfigured()) return null;
   const ids = await feedIds(ticker).catch(() => ({}) as { regular?: string; allDay?: string });
   const want = [ids.regular, ids.allDay].filter(Boolean) as string[];
@@ -63,6 +98,7 @@ export async function liveQuote(ticker: string): Promise<LiveQuote | null> {
   const price = Number(use.p.price.price) * 10 ** use.p.price.expo;
   if (!(price > 0)) return null;
   return {
+    provider: "pyth",
     price,
     publishTime: use.p.price.publish_time,
     symbol: use.s === "regular" ? `Equity.US.${ticker}/USD` : `Equity.Index.${ticker}/USD`,

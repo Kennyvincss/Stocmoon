@@ -1,13 +1,13 @@
 import { isAddress } from "viem";
 import { getStock } from "@/lib/server/stocks";
-import { liveQuote, pythConfigured } from "@/lib/server/live";
+import { liveConfigured, liveQuote } from "@/lib/server/live";
 import { bad, json, rateLimit } from "@/lib/server/http";
 
 export const dynamic = "force-dynamic";
 
 /**
  * Live price for the chart and P&L (display only — markets settle on the Chainlink reference price).
- * Token price = underlying live share price × the token's current multiplier (from the Tokenized Stocks API).
+ * Token price = underlying live share price (Alpaca IEX or Pyth) × the token's current multiplier (Tokenized Stocks API).
  * Falls back to the Chainlink reference price when no live source is configured or the source fails.
  */
 export async function GET(_: Request, ctx: { params: Promise<{ address: string }> }) {
@@ -26,7 +26,7 @@ export async function GET(_: Request, ctx: { params: Promise<{ address: string }
   if (q) {
     const multiplier = stock.multiplier ?? 1;
     return json({
-      source: "pyth",
+      source: q.provider,
       session: q.session,
       symbol: q.symbol,
       price: q.price * multiplier,
@@ -36,5 +36,5 @@ export async function GET(_: Request, ctx: { params: Promise<{ address: string }
       reference,
     });
   }
-  return json({ source: "reference", liveConfigured: pythConfigured(), price: reference.price, time: reference.time, reference });
+  return json({ source: "reference", liveConfigured: liveConfigured(), price: reference.price, time: reference.time, reference });
 }

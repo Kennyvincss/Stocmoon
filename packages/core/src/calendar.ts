@@ -95,3 +95,13 @@ export const SESSION_LABELS: Record<SessionName, string> = {
   "post-market": "Post-market session",
   closed: "Feed closed (weekend/holiday) — last value held",
 };
+
+/** Regular US trading hours (09:30–16:00 ET, NYSE trading days). Intraday feeds only publish then. */
+export function isRegularSession(ms: number): boolean {
+  return sessionAt(ms) === "regular";
+}
+
+/** Intraday markets must open and close (plus settlement delay) inside the same regular session. */
+export function canScheduleIntraday(nowMs: number, closeMs: number, settlementDelayMs = 120_000): boolean {
+  return isRegularSession(nowMs) && isRegularSession(closeMs + settlementDelayMs) && etParts(nowMs).date === etParts(closeMs + settlementDelayMs).date;
+}

@@ -31,6 +31,7 @@ cast send $USDC "mint(address,uint256)" $ME 1000000000000 --rpc-url $APP --priva
 
 TOKEN_A=0x00000000000000000000000000000000F1A70001
 TOKEN_B=0x00000000000000000000000000000000F1A70002
+[ -f config/assets.json ] && cp config/assets.json "$LOGS/assets.json.bak"
 cat > config/assets.json <<JSON
 {"assets":[
  {"symbol":"FIXTA","token":"$TOKEN_A","feed":"$FEED_A","decimals":8,"maxStaleness":7200},
@@ -39,7 +40,7 @@ JSON
 USDC_ADDRESS=$USDC KEEPER_ADDRESS=$ME ENABLE_SHORT_DURATIONS=false \
   forge script script/Deploy.s.sol --rpc-url $APP --private-key $PK --broadcast > "$LOGS/deploy.log" 2>&1
 cat deployments/31337.json
-rm config/assets.json
+if [ -f "$LOGS/assets.json.bak" ]; then mv "$LOGS/assets.json.bak" config/assets.json; else rm config/assets.json; fi
 
 export FIXTURE_TOKENS="[
  {\"contract_address\":\"$TOKEN_A\",\"symbol\":\"FIXTA\",\"name\":\"Fixture Token A (synthetic)\",\"decimals\":18,\"total_supply\":\"1000\",\"multiplier\":1.02,\"nav_price\":180,\"nav_price_updated_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"first_mint_date\":\"2026-08-24T00:00:00Z\"},

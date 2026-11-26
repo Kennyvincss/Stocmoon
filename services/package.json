@@ -11,6 +11,7 @@
     "relayer": "tsx src/relayer.ts",
     "snapshotter": "tsx src/snapshotter.ts",
     "create-event": "tsx src/create-event.ts",
+    "operator": "tsx src/operator.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },

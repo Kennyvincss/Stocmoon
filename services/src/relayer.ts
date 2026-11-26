@@ -25,7 +25,8 @@ async function discoverMirrors(client: PublicClient, oracle: Address): Promise<M
     const asset = await client.readContract({ address: oracle, abi: oracleAdapterAbi, functionName: "assetAt", args: [i] });
     const info = await client.readContract({ address: oracle, abi: oracleAdapterAbi, functionName: "getAsset", args: [asset] });
     const source = await client.readContract({ address: info.feed, abi: mirrorAggregatorAbi, functionName: "sourceFeed" }).catch(() => null);
-    if (source) out.push({ asset, mirror: info.feed, source });
+    // intraday feeds (Alpaca, written by the operator) have no mainnet source: skip them here
+    if (source && !/^0x0{40}$/i.test(source)) out.push({ asset, mirror: info.feed, source });
   }
   return out;
 }

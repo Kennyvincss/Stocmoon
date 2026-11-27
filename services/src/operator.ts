@@ -162,10 +162,17 @@ async function main() {
   let lastPush = 0;
   let lastKeep = 0;
   let stop = false;
+  // optional maximum runtime (GitHub Actions jobs are limited to 6 hours)
+  const maxRuntimeMin = Number(optEnv("OPERATOR_MAX_RUNTIME_MIN") ?? "0");
+  const startedAt = Date.now();
   process.on("SIGINT", () => (stop = true));
   process.on("SIGTERM", () => (stop = true));
   let announcedClosed = false;
   while (!stop) {
+    if (maxRuntimeMin > 0 && Date.now() - startedAt > maxRuntimeMin * 60_000) {
+      log("operator", "max runtime reached; exiting so the next scheduled run can take over", { maxRuntimeMin });
+      break;
+    }
     try {
       const blockTs = Number((await client.getBlock()).timestamp);
       const open = inSession(Date.now());

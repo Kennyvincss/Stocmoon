@@ -108,3 +108,25 @@ export function isRegularSession(ms: number): boolean {
 export function canScheduleIntraday(nowMs: number, closeMs: number, settlementDelayMs = 120_000): boolean {
   return isRegularSession(nowMs) && isRegularSession(closeMs + settlementDelayMs) && etParts(nowMs).date === etParts(closeMs + settlementDelayMs).date;
 }
+
+const FIVE_MIN = 5 * 60_000;
+
+/** Next start of regular trading hours at or after `fromMs` (5-minute resolution; null if none within 10 days). */
+export function nextRegularOpen(fromMs: number): number | null {
+  const start = Math.ceil(fromMs / FIVE_MIN) * FIVE_MIN;
+  for (let t = start, i = 0; i < 2880; i++, t += FIVE_MIN) if (isRegularSession(t)) return t;
+  return null;
+}
+
+/** End of the current regular session (first moment after `fromMs` that is no longer regular hours), or null. */
+export function regularSessionEnd(fromMs: number): number | null {
+  if (!isRegularSession(fromMs)) return null;
+  const start = Math.ceil((fromMs + 1) / FIVE_MIN) * FIVE_MIN;
+  for (let t = start, i = 0; i < 200; i++, t += FIVE_MIN) if (!isRegularSession(t)) return t;
+  return null;
+}
+
+/** "Mon 9:30 AM ET" style label. */
+export function formatEt(ms: number): string {
+  return `${new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", weekday: "short", hour: "numeric", minute: "2-digit" }).format(new Date(ms))} ET`;
+}

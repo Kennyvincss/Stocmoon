@@ -62,3 +62,18 @@ describe("early closes", () => {
     expect(canScheduleIntraday(Date.parse("2026-11-27T12:30:00-05:00"), Date.parse("2026-11-27T13:30:00-05:00"))).toBe(false);
   });
 });
+
+import { formatEt, nextRegularOpen, regularSessionEnd } from "../src/calendar";
+
+describe("session boundaries", () => {
+  it("finds the next open across a weekend", () => {
+    const sat = Date.parse("2026-11-28T12:00:00-05:00");
+    expect(nextRegularOpen(sat)).toBe(Date.parse("2026-11-30T09:30:00-05:00"));
+    expect(formatEt(nextRegularOpen(sat)!)).toBe("Mon 9:30 AM ET");
+  });
+  it("finds today's close, including half days", () => {
+    expect(regularSessionEnd(Date.parse("2026-12-01T11:02:00-05:00"))).toBe(Date.parse("2026-12-01T16:00:00-05:00"));
+    expect(regularSessionEnd(Date.parse("2026-11-27T10:00:00-05:00"))).toBe(Date.parse("2026-11-27T13:00:00-05:00"));
+    expect(regularSessionEnd(Date.parse("2026-11-28T10:00:00-05:00"))).toBeNull();
+  });
+});

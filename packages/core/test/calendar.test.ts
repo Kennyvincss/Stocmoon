@@ -77,3 +77,27 @@ describe("session boundaries", () => {
     expect(regularSessionEnd(Date.parse("2026-11-28T10:00:00-05:00"))).toBeNull();
   });
 });
+
+import { canScheduleIntradayIn, intradayWindowEnd, isExtendedSession, nextIntradayOpen } from "../src/calendar";
+
+describe("extended hours", () => {
+  it("covers 04:00–20:00 ET on trading days", () => {
+    expect(isExtendedSession(Date.parse("2026-12-01T04:00:00-05:00"))).toBe(true);
+    expect(isExtendedSession(Date.parse("2026-12-01T19:59:00-05:00"))).toBe(true);
+    expect(isExtendedSession(Date.parse("2026-12-01T20:00:00-05:00"))).toBe(false);
+    expect(isExtendedSession(Date.parse("2026-12-01T03:59:00-05:00"))).toBe(false);
+    expect(isExtendedSession(Date.parse("2026-11-28T10:00:00-05:00"))).toBe(false); // Saturday
+  });
+  it("ends at 17:00 ET on half days", () => {
+    expect(isExtendedSession(Date.parse("2026-11-27T16:30:00-05:00"))).toBe(true);
+    expect(isExtendedSession(Date.parse("2026-11-27T17:00:00-05:00"))).toBe(false);
+    expect(intradayWindowEnd(Date.parse("2026-11-27T10:00:00-05:00"))).toBe(Date.parse("2026-11-27T17:00:00-05:00"));
+  });
+  it("schedules within one day's window and finds the next open", () => {
+    const t = Date.parse("2026-12-01T19:30:00-05:00");
+    expect(canScheduleIntradayIn("extended", t, t + 15 * 60_000)).toBe(true);
+    expect(canScheduleIntradayIn("extended", t, t + 60 * 60_000)).toBe(false);
+    expect(canScheduleIntradayIn("regular", t, t + 5 * 60_000)).toBe(false);
+    expect(nextIntradayOpen(Date.parse("2026-11-28T12:00:00-05:00"))).toBe(Date.parse("2026-11-30T04:00:00-05:00"));
+  });
+});

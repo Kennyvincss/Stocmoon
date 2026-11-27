@@ -2,7 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { erc20Abi, maxUint256, type Address } from "viem";
 import {
-  canScheduleIntraday, findSettlementProof, intradayAssetId, isRegularSession, mirrorAggregatorAbi, oracleAdapterAbi,
+  canScheduleIntradayIn, findSettlementProof, formatEt, intradayAssetId, isIntradayOpen, mirrorAggregatorAbi, nextIntradayOpen,
+  oracleAdapterAbi, type IntradayHours,
   stocMoonMarketsAbi,
 } from "@stocmoon/core";
 import { ROOT, deployment, env, log, optEnv, privateKey, sleep } from "./lib/env";
@@ -14,7 +15,8 @@ import { listMarkets, recycleLiquidity } from "./lib/ops";
  *
  *   pnpm operator
  *
- * Settings come from services/.env (see services/.env.example). During US regular trading hours it:
+ * Settings come from services/.env (see services/.env.example). During US trading hours (extended 04:00–20:00 ET by
+ * default; INTRADAY_HOURS=regular for 09:30–16:00) it:
  *   1. publishes Alpaca IEX last-trade prices into each stock's intraday feed (every ~30s, plus a heartbeat)
  *   2. opens 5m–4H UP/DOWN markets that close inside the same session
  *   3. settles expired intraday markets with round proofs (the contract verifies them)
@@ -35,8 +37,10 @@ interface IntradayEntry {
 const ALPACA_DATA = process.env.ALPACA_DATA_URL || "https://data.alpaca.markets";
 /** LOCAL TESTING ONLY: treat every moment as regular trading hours. */
 const IGNORE_HOURS = process.env.INTRADAY_IGNORE_MARKET_HOURS === "true";
-const inSession = (ms: number) => IGNORE_HOURS || isRegularSession(ms);
-const canSchedule = (now: number, close: number) => IGNORE_HOURS || canScheduleIntraday(now, close);
+/** "extended" (default): 04:00–20:00 ET; "regular": 09:30–16:00 ET. */
+const HOURS: IntradayHours = process.env.INTRADAY_HOURS === "regular" ? "regular" : "extended";
+const inSession = (ms: number) => IGNORE_HOURS || isIntradayOpen(ms, HOURS);
+const canSchedule = (now: number, close: number) => IGNORE_HOURS || canScheduleIntradayIn(HOURS, now, close);
 
 async function alpacaLatest(symbols: string[]): Promise<Record<string, { p: number; t: number }>> {
   const url = `${ALPACA_DATA}/v2/stocks/trades/latest?symbols=${symbols.join(",")}&feed=${process.env.ALPACA_FEED || "iex"}`;
@@ -73,7 +77,10 @@ async function main() {
   const durations = (optEnv("INTRADAY_DURATIONS") ?? "300,900,3600").split(",").map(Number).sort((a, b) => a - b);
   const liquidity = BigInt(env("INTRADAY_LIQUIDITY", "5000000"));
   const pushEvery = Number(env("INTRADAY_PUSH_INTERVAL_MS", "30000"));
-  const heartbeat = Number(env("INTRADAY_HEARTBEAT_S", "120"));
+  const heartbeat = Number(env("INTRADAY_HEARTBEAT_S", "240")); // must stay below the feeds' 300s staleness limit
+  // a stock only gets NEW markets if it actually traded recently (extended hours can be thin or dead)
+  const activityS = Number(env("INTRADAY_ACTIVITY_S", "900"));
+  const lastTrade: Record<string, number> = {};
   const keeperEvery = Number(env("INTRADAY_KEEPER_INTERVAL_MS", "20000"));
   const key = process.env.OPERATOR_PRIVATE_KEY ? privateKey("OPERATOR_PRIVATE_KEY") : privateKey("KEEPER_PRIVATE_KEY");
   env("ALPACA_API_KEY_ID");
@@ -83,7 +90,7 @@ async function main() {
   const wallet = walletFor(key);
   const me = wallet.account.address;
   const pseudo = new Map(symbols.map((s) => [cfg[s]!.intradayAsset.toLowerCase(), s]));
-  log("operator", "started", { operator: me, symbols, durations, liquidityUsdc: Number(liquidity) / 1e6 });
+  log("operator", "started", { operator: me, symbols, durations, hours: HOURS, liquidityUsdc: Number(liquidity) / 1e6 });
 
   const send = async (functionName: string, args: readonly unknown[], address: Address = d.markets, abi: readonly unknown[] = stocMoonMarketsAbi) => {
     const { request } = await client.simulateContract({ address, abi: abi as never, functionName: functionName as never, args: args as never, account: wallet.account });
@@ -111,6 +118,7 @@ async function main() {
   let warnedMissing = false;
   async function publishPrices(blockTs: number) {
     const trades = await alpacaLatest(symbols);
+    for (const [sym, tr] of Object.entries(trades)) lastTrade[sym] = tr.t;
     const missing = symbols.filter((s) => !trades[s]);
     if (missing.length && !warnedMissing) {
       log("operator", "no Alpaca trades for these symbols (not listed on Alpaca/IEX?) — their intraday markets stay closed", { missing });
@@ -169,6 +177,8 @@ async function main() {
         const asset = cfg[s]!.intradayAsset;
         const open = markets.some((m) => m.assetA.toLowerCase() === asset.toLowerCase() && m.status === "OPEN" && blockTs < m.tradingEndsAt && m.closeTime - m.openTime === dur);
         if (open) continue;
+        const traded = lastTrade[s];
+        if (!IGNORE_HOURS && (traded === undefined || blockTs - traded > activityS)) continue; // no recent real trades
         const fresh = await client.readContract({ address: d.oracleAdapter, abi: oracleAdapterAbi, functionName: "isTradable", args: [asset] });
         if (!fresh) continue;
         if (balance < liquidity) {
@@ -199,7 +209,10 @@ async function main() {
     try {
       const blockTs = Number((await client.getBlock()).timestamp);
       const open = inSession(Date.now());
-      if (!open && !announcedClosed) log("operator", "US market closed: settling and recycling only (prices resume 09:30 ET)");
+      if (!open && !announcedClosed) {
+        const next = nextIntradayOpen(Date.now(), HOURS);
+        log("operator", `US market closed: settling and recycling only (prices resume ${next ? formatEt(next) : "next trading day"})`, { hours: HOURS });
+      }
       announcedClosed = !open;
       if (open && Date.now() - lastPush >= pushEvery) {
         lastPush = Date.now();

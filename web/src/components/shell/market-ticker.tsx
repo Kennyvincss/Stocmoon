@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { DURATION_LABELS, formatEt, isIntradayDuration, isRegularSession, nextRegularOpen, regularSessionEnd, sideLabels } from "@stocmoon/core";
+import {
+  DURATION_LABELS, DEFAULT_INTRADAY_HOURS, formatEt, intradayWindowEnd, isIntradayDuration, isIntradayOpen, nextIntradayOpen,
+  sessionAt, sideLabels,
+} from "@stocmoon/core";
 import { useMarkets } from "@/lib/api";
 import { useNow } from "@/hooks/useNow";
 import { fmtDuration } from "@/lib/format";
@@ -29,8 +32,14 @@ export function MarketTicker() {
   const minute = Math.floor(now / 60_000);
   const session = useMemo(() => {
     const t = minute * 60_000;
-    const open = isRegularSession(t);
-    return { open, end: open ? regularSessionEnd(t) : null, next: open ? null : nextRegularOpen(t) };
+    const open = isIntradayOpen(t, DEFAULT_INTRADAY_HOURS);
+    const name = sessionAt(t);
+    return {
+      open,
+      label: name === "pre-market" ? "PRE-MARKET" : name === "post-market" ? "AFTER-HOURS" : "US MARKET OPEN",
+      end: open ? intradayWindowEnd(t, DEFAULT_INTRADAY_HOURS) : null,
+      next: open ? null : nextIntradayOpen(t, DEFAULT_INTRADAY_HOURS),
+    };
   }, [minute]);
 
   const intraday = new Map<number, number>();
@@ -46,7 +55,7 @@ export function MarketTicker() {
   items.push(
     session.open ? (
       <span key="status" className="font-semibold text-up">
-        ● US MARKET OPEN — short markets live until {session.end ? formatEt(session.end).replace(/^\w+ /, "") : "the close"}
+        ● {session.label} — short markets for actively trading stocks until {session.end ? formatEt(session.end).replace(/^\w+ /, "") : "the close"}
       </span>
     ) : (
       <span key="status" className="font-semibold text-warn">

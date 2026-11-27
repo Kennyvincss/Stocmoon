@@ -130,3 +130,43 @@ export function regularSessionEnd(fromMs: number): number | null {
 export function formatEt(ms: number): string {
   return `${new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", weekday: "short", hour: "numeric", minute: "2-digit" }).format(new Date(ms))} ET`;
 }
+
+// ------------------------------------------------------------------ intraday trading windows
+
+/** Which hours intraday (5m–4H) markets run in. "extended" = pre-market + regular + after-hours (04:00–20:00 ET). */
+export type IntradayHours = "regular" | "extended";
+export const DEFAULT_INTRADAY_HOURS: IntradayHours = "extended";
+
+/** Extended US trading hours: 04:00–20:00 ET on trading days (17:00 on NYSE half days). */
+export function isExtendedSession(ms: number): boolean {
+  const s = sessionAt(ms);
+  if (s === "pre-market" || s === "regular") return true;
+  if (s === "post-market") {
+    const p = etParts(ms);
+    return !NYSE_EARLY_CLOSES.has(p.date) || p.hour < 17;
+  }
+  return false;
+}
+
+export function isIntradayOpen(ms: number, hours: IntradayHours = DEFAULT_INTRADAY_HOURS): boolean {
+  return hours === "regular" ? isRegularSession(ms) : isExtendedSession(ms);
+}
+
+/** Open and close (+ settlement delay) inside the same trading day's intraday window. */
+export function canScheduleIntradayIn(hours: IntradayHours, nowMs: number, closeMs: number, settlementDelayMs = 120_000): boolean {
+  const end = closeMs + settlementDelayMs;
+  return isIntradayOpen(nowMs, hours) && isIntradayOpen(end, hours) && etParts(nowMs).date === etParts(end).date;
+}
+
+export function nextIntradayOpen(fromMs: number, hours: IntradayHours = DEFAULT_INTRADAY_HOURS): number | null {
+  const start = Math.ceil(fromMs / FIVE_MIN) * FIVE_MIN;
+  for (let t = start, i = 0; i < 2880; i++, t += FIVE_MIN) if (isIntradayOpen(t, hours)) return t;
+  return null;
+}
+
+export function intradayWindowEnd(fromMs: number, hours: IntradayHours = DEFAULT_INTRADAY_HOURS): number | null {
+  if (!isIntradayOpen(fromMs, hours)) return null;
+  const start = Math.ceil((fromMs + 1) / FIVE_MIN) * FIVE_MIN;
+  for (let t = start, i = 0; i < 300; i++, t += FIVE_MIN) if (!isIntradayOpen(t, hours)) return t;
+  return null;
+}

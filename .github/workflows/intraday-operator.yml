@@ -1,14 +1,15 @@
 name: Intraday operator (5m-4H markets)
 
-# Runs services/src/operator.ts in the cloud during US market hours (Mon-Fri), so no PC needs to stay on.
-# GitHub limits a job to 6 hours, so the session is covered by two back-to-back runs. The concurrency group
-# queues the second run until the first exits — only one operator runs at a time.
-# Covers 13:25-21:20 UTC, i.e. 09:30-16:00 ET in both winter (EST) and summer (EDT) time.
+# Runs services/src/operator.ts in the cloud during extended US trading hours (04:00-20:00 ET, Mon-Fri), so no PC
+# needs to stay on. GitHub limits a job to 6 hours, so the day is covered by three back-to-back runs; the concurrency
+# group queues each run until the previous one exits, so only one operator runs at a time.
+# Covers ~07:55-01:25 UTC, i.e. 04:00-20:00 ET in both winter (EST) and summer (EDT) time.
 # Free for public repositories. Requires secrets: OPERATOR_PRIVATE_KEY, ALPACA_API_KEY_ID, ALPACA_API_SECRET.
 on:
   schedule:
-    - cron: "25 13 * * 1-5"
-    - cron: "5 19 * * 1-5"
+    - cron: "55 7 * * 1-5"
+    - cron: "40 13 * * 1-5"
+    - cron: "30 19 * * 1-5"
   workflow_dispatch:
     inputs:
       minutes:
@@ -31,8 +32,9 @@ jobs:
       ALPACA_API_SECRET: ${{ secrets.ALPACA_API_SECRET }}
       INTRADAY_DURATIONS: "300,900,3600"
       INTRADAY_LIQUIDITY: "5000000"
-      # first run lasts until ~19:15 UTC; the 19:05 run waits in the queue and then covers the close
-      OPERATOR_MAX_RUNTIME_MIN: ${{ github.event.inputs.minutes || (github.event.schedule == '25 13 * * 1-5' && '350' || '135') }}
+      INTRADAY_HOURS: extended
+      # each run lasts ~5h50m; the next scheduled run waits in the queue and takes over
+      OPERATOR_MAX_RUNTIME_MIN: ${{ github.event.inputs.minutes || '350' }}
     steps:
       - name: Check secrets
         run: |

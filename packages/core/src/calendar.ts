@@ -21,6 +21,9 @@ export const NYSE_HOLIDAYS = new Set<string>([
   "2027-07-05", "2027-09-06", "2027-11-25", "2027-12-24",
 ]);
 
+/** NYSE early closes (13:00 ET): regular session ends early; the rest of the day is treated as post-market. */
+export const NYSE_EARLY_CLOSES = new Set<string>(["2026-11-27", "2026-12-24", "2027-11-26"]);
+
 const etFormatter = new Intl.DateTimeFormat("en-US", {
   timeZone: "America/New_York",
   year: "numeric",
@@ -72,7 +75,7 @@ export function sessionAt(ms: number): SessionName {
   const mins = p.hour * 60 + p.minute;
   if (mins >= 20 * 60 || mins < 4 * 60) return "overnight";
   if (mins < 9 * 60 + 30) return "pre-market";
-  if (mins < 16 * 60) return "regular";
+  if (mins < 16 * 60) return NYSE_EARLY_CLOSES.has(tradingDay.date) && mins >= 13 * 60 ? "post-market" : "regular";
   return "post-market";
 }
 

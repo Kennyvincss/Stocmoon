@@ -53,3 +53,12 @@ describe("intraday helpers", () => {
     expect(intradayAssetId("0xB20000000000000000000078EE7CE2FE4908108C".toLowerCase() as `0x${string}`)).toBe(a);
   });
 });
+
+describe("early closes", () => {
+  it("ends the regular session at 13:00 ET on the day after Thanksgiving", () => {
+    expect(isRegularSession(Date.parse("2026-11-27T12:30:00-05:00"))).toBe(true);
+    expect(isRegularSession(Date.parse("2026-11-27T13:00:00-05:00"))).toBe(false);
+    expect(canScheduleIntraday(Date.parse("2026-11-27T12:30:00-05:00"), Date.parse("2026-11-27T12:45:00-05:00"))).toBe(true);
+    expect(canScheduleIntraday(Date.parse("2026-11-27T12:30:00-05:00"), Date.parse("2026-11-27T13:30:00-05:00"))).toBe(false);
+  });
+});

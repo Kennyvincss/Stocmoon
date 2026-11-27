@@ -58,3 +58,20 @@ send duplicate transactions from the same wallet).
 Base Sepolia gas only (fractions of a cent per transaction) plus test USDC: each new market is seeded with
 `INTRADAY_LIQUIDITY` (default 5 USDC), returned when it settles. Top up from faucet.circle.com when the log
 says "not enough USDC".
+
+## Adding stocks to intraday markets
+
+Intraday feeds are discovered onchain, so adding stocks is one admin command (run where the admin keystore lives):
+
+```bash
+cd stocmoon/contracts && git pull
+set -a; source deploy.base-sepolia.env; set +a
+INTRADAY_SYMBOLS=AAPL,AMZN,ANT,CRCL,GOOGL,INTC,META,MSFT,MSTR,NVDA,SNDK,SPCX,TSLA \
+  forge script script/DeployIntraday.s.sol --rpc-url base_sepolia --account stocmoon-admin --broadcast
+```
+
+Stocks that already have an intraday feed are skipped. The operator picks up the new ones on its next start.
+Symbols that Alpaca does not list (no IEX trades) are logged and simply get no intraday markets.
+
+Each open market locks `INTRADAY_LIQUIDITY` (5 USDC) until it settles; with all 13 stocks × 5m/15m/1H that is up to
+195 test USDC. With less, the operator opens the shortest durations first and fills in as USDC is recycled.

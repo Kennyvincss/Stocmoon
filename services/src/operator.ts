@@ -2,7 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { erc20Abi, maxUint256, type Address } from "viem";
 import {
-  canScheduleIntraday, findSettlementProof, isRegularSession, mirrorAggregatorAbi, oracleAdapterAbi, stocMoonMarketsAbi,
+  canScheduleIntraday, findSettlementProof, intradayAssetId, isRegularSession, mirrorAggregatorAbi, oracleAdapterAbi,
+  stocMoonMarketsAbi,
 } from "@stocmoon/core";
 import { ROOT, deployment, env, log, optEnv, privateKey, sleep } from "./lib/env";
 import { appClient, walletFor } from "./lib/clients";
@@ -55,10 +56,20 @@ async function alpacaLatest(symbols: string[]): Promise<Record<string, { p: numb
 
 async function main() {
   const d = deployment();
-  const file = join(ROOT, "contracts/deployments", `${d.chainId}-intraday.json`);
-  if (!existsSync(file)) throw new Error(`${file} not found — run script/DeployIntraday.s.sol first`);
-  const cfg = JSON.parse(readFileSync(file, "utf8")) as Record<string, IntradayEntry>;
+  const client0 = appClient();
+  // Discover intraday feeds from the chain: for every verified stock, check whether its intraday pseudo asset is
+  // registered in the OracleAdapter. Adding stocks therefore only needs the admin's DeployIntraday run.
+  const { assets } = JSON.parse(readFileSync(join(ROOT, "contracts/config/assets.json"), "utf8")) as { assets: { symbol: string; token: Address }[] };
+  const only = optEnv("INTRADAY_SYMBOLS")?.split(",").map((x) => x.trim().toUpperCase());
+  const cfg: Record<string, IntradayEntry> = {};
+  for (const a of assets) {
+    if (only && !only.includes(a.symbol.toUpperCase())) continue;
+    const pseudoId = intradayAssetId(a.token);
+    const info = await client0.readContract({ address: d.oracleAdapter, abi: oracleAdapterAbi, functionName: "getAsset", args: [pseudoId] });
+    if (info.feed && !/^0x0{40}$/i.test(info.feed) && info.enabled) cfg[a.symbol] = { token: a.token, intradayAsset: pseudoId, feed: info.feed };
+  }
   const symbols = Object.keys(cfg);
+  if (!symbols.length) throw new Error("No intraday feeds registered onchain — run script/DeployIntraday.s.sol first");
   const durations = (optEnv("INTRADAY_DURATIONS") ?? "300,900,3600").split(",").map(Number).sort((a, b) => a - b);
   const liquidity = BigInt(env("INTRADAY_LIQUIDITY", "5000000"));
   const pushEvery = Number(env("INTRADAY_PUSH_INTERVAL_MS", "30000"));
@@ -91,27 +102,39 @@ async function main() {
 
   // last published timestamp per symbol, from chain
   const lastTs: Record<string, number> = {};
+  const lastAnswer: Record<string, bigint> = {};
   for (const s of symbols) {
     const round = await client.readContract({ address: cfg[s]!.feed, abi: mirrorAggregatorAbi, functionName: "latestRound" });
     lastTs[s] = round > 0n ? Number((await client.readContract({ address: cfg[s]!.feed, abi: mirrorAggregatorAbi, functionName: "latestRoundData" }))[3]) : 0;
   }
 
+  let warnedMissing = false;
   async function publishPrices(blockTs: number) {
     const trades = await alpacaLatest(symbols);
+    const missing = symbols.filter((s) => !trades[s]);
+    if (missing.length && !warnedMissing) {
+      log("operator", "no Alpaca trades for these symbols (not listed on Alpaca/IEX?) — their intraday markets stay closed", { missing });
+      warnedMissing = true;
+    }
     for (const s of symbols) {
       const tr = trades[s];
       if (!tr) continue;
+      const answer = BigInt(Math.round(tr.p * 1e8));
       let updatedAt: number;
-      if (tr.t > lastTs[s]!) updatedAt = Math.min(tr.t, blockTs);
-      else if (blockTs - lastTs[s]! >= heartbeat) updatedAt = blockTs; // still the price in effect now
+      const stale = blockTs - lastTs[s]! >= heartbeat;
+      // publish on a price change, or on the heartbeat (keeps the feed fresh); saves gas across many stocks
+      if (tr.t > lastTs[s]! && (answer !== lastAnswer[s] || stale)) updatedAt = Math.min(tr.t, blockTs);
+      else if (stale) updatedAt = blockTs; // still the price in effect now
       else continue;
       if (updatedAt <= lastTs[s]!) continue;
-      const answer = BigInt(Math.round(tr.p * 1e8));
       const ok = await send("pushRound", [BigInt(updatedAt), answer, BigInt(updatedAt), BigInt(updatedAt)], cfg[s]!.feed, mirrorAggregatorAbi).catch((e) => {
         log("operator", "push failed", { symbol: s, error: (e as Error).message.slice(0, 160) });
         return false;
       });
-      if (ok) lastTs[s] = updatedAt;
+      if (ok) {
+        lastTs[s] = updatedAt;
+        lastAnswer[s] = answer;
+      }
     }
   }
 

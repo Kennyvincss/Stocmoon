@@ -5,7 +5,20 @@ The operator publishes live Alpaca (IEX) prices for intraday markets and opens, 
 during US market hours (09:30–16:00 ET, Mon–Fri; 14:30–21:00 UTC). The 24H/7D/30D markets keep running on
 GitHub Actions and do not depend on it.
 
-## One-time setup (per computer)
+## Option A (recommended): run it on GitHub Actions — no computer needed
+
+The repository is public, so GitHub Actions is free. `.github/workflows/intraday-operator.yml` starts the operator
+automatically every weekday during US market hours (two back-to-back runs, because a GitHub job is limited to 6 hours).
+
+1. GitHub → repository **Settings → Secrets and variables → Actions** → make sure these secrets exist:
+   `OPERATOR_PRIVATE_KEY` (already added for the 5-minute job), `ALPACA_API_KEY_ID`, `ALPACA_API_SECRET`.
+2. That's it. Check progress under **Actions → Intraday operator**. Start a run manually with **Run workflow**.
+
+Do not run the PC operator at the same time — two copies would send duplicate transactions from the same wallet.
+
+## Option B: run it on a computer
+
+### One-time setup (per computer)
 
 1. Install **Node.js 22 LTS** from nodejs.org and **Git** (Windows: git-scm.com, use Git Bash).
 2. Install pnpm and get the code:
@@ -26,7 +39,7 @@ GitHub Actions and do not depend on it.
    ```
    `services/.env` is git-ignored. Keep it private; it holds the operator key.
 
-## Run
+### Run
 
 ```bash
 pnpm operator
@@ -35,7 +48,7 @@ pnpm operator
 Leave the window open. Stop with **Ctrl+C**; restart any time — it resumes from onchain state.
 Outside market hours it only settles and recycles, so it is safe to leave running.
 
-## Moving to another computer
+### Moving to another computer
 
 Repeat the one-time setup there and copy `services/.env`. Run only **one** operator at a time (two copies would
 send duplicate transactions from the same wallet).

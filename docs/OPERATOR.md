@@ -2,13 +2,13 @@
 
 The operator publishes live Alpaca (IEX) prices for intraday markets and opens, settles and recycles the
 5m–4H markets. It runs on **any computer** with Node.js — Windows, macOS or Linux — and only needs to be on
-during US market hours (09:30–16:00 ET, Mon–Fri; 14:30–21:00 UTC). The 24H/7D/30D markets keep running on
+during extended US trading hours (04:00–20:00 ET, Mon–Fri; 17:00 on half days). The 24H/7D/30D markets keep running on
 GitHub Actions and do not depend on it.
 
 ## Option A (recommended): run it on GitHub Actions — no computer needed
 
 The repository is public, so GitHub Actions is free. `.github/workflows/intraday-operator.yml` starts the operator
-automatically every weekday during US market hours (two back-to-back runs, because a GitHub job is limited to 6 hours).
+automatically every weekday during extended trading hours, 04:00–20:00 ET (three back-to-back runs, because a GitHub job is limited to 6 hours). A stock only gets new markets while it is actually trading on IEX (a trade in the last 15 minutes), so thin pre-market/after-hours periods don't produce frozen-price markets.
 
 1. GitHub → repository **Settings → Secrets and variables → Actions** → make sure these secrets exist:
    `OPERATOR_PRIVATE_KEY` (already added for the 5-minute job), `ALPACA_API_KEY_ID`, `ALPACA_API_SECRET`.

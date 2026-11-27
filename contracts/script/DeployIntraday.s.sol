@@ -11,7 +11,7 @@ import {MirrorAggregator} from "../src/MirrorAggregator.sol";
 ///         asset id (the token's own Chainlink entry is untouched), and enables the intraday durations.
 ///         Must be run by the admin (ASSET_ADMIN_ROLE on the adapter, CONFIG_ROLE on the markets).
 ///
-/// env INTRADAY_SYMBOLS        comma-separated, from config/assets.json (default "NVDA,TSLA")
+/// env INTRADAY_SYMBOLS        comma-separated, from config/assets.json (default "NVDA,TSLA"); existing ones are skipped
 /// env RELAYER_ADDRESS         operator wallet that publishes prices
 /// env INTRADAY_MAX_STALENESS  seconds (default 300)
 /// env INTRADAY_MIN_LIQUIDITY  min seed per market in USDC units (default 5 USDC)
@@ -43,23 +43,22 @@ contract DeployIntraday is Script {
 
         vm.startBroadcast();
         (, address admin,) = vm.readCallers();
-        string memory out = "intraday";
-        string memory json;
         for (uint256 i; i < symbols.length; ++i) {
             address token;
             for (uint256 j; j < assets.length; ++j) {
                 if (keccak256(bytes(assets[j].symbol)) == keccak256(bytes(symbols[i]))) token = assets[j].token;
             }
             require(token != address(0), string.concat("unknown symbol ", symbols[i]));
+            address pseudo = intradayAssetId(token);
+            // never replace an existing intraday feed (open markets keep their snapshotted feed, but new ones would move)
+            if (oracle.getAsset(pseudo).feed != address(0)) {
+                console2.log(symbols[i], "already has an intraday feed, skipped");
+                continue;
+            }
             MirrorAggregator feed = new MirrorAggregator(
                 admin, relayer, 8, string.concat(symbols[i], " / USD (Alpaca IEX intraday)"), 0, address(0)
             );
-            address pseudo = intradayAssetId(token);
             oracle.configureAsset(pseudo, address(feed), staleness, string.concat(symbols[i], "-INTRADAY"));
-            string memory k = symbols[i];
-            vm.serializeAddress(k, "token", token);
-            vm.serializeAddress(k, "intradayAsset", pseudo);
-            json = vm.serializeString(out, symbols[i], vm.serializeAddress(k, "feed", address(feed)));
             console2.log(symbols[i], address(feed), pseudo);
         }
         markets.setDuration(5 minutes, true, 1 minutes);
@@ -69,7 +68,6 @@ contract DeployIntraday is Script {
         markets.setDuration(4 hours, true, 15 minutes);
         markets.setCreationPolicy(markets.openCreation(), minLiquidity);
         vm.stopBroadcast();
-
-        vm.writeJson(json, string.concat(root, "/deployments/", vm.toString(block.chainid), "-intraday.json"));
+        // The operator discovers intraday feeds onchain (OracleAdapter.getAsset(intradayAssetId(token))).
     }
 }

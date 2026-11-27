@@ -10,6 +10,7 @@ import { motion } from "framer-motion";
 import { Logo } from "@/components/logo";
 import { useTheme } from "@/components/providers";
 import { NAV, isActive } from "./nav";
+import { MarketTicker } from "./market-ticker";
 import { cn } from "@/lib/utils";
 import { contractsConfigured, isTestnet, publicEnv } from "@/lib/public-env";
 import { appChain } from "@/lib/wagmi";
@@ -87,6 +88,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <ConnectButton chainStatus="icon" accountStatus={{ smallScreen: "avatar", largeScreen: "full" }} showBalance={false} />
           </div>
         </header>
+
+        {contractsConfigured && <MarketTicker />}
 
         {isTestnet && (
           <div className="border-b border-border bg-warn-soft px-4 py-2 text-center text-xs text-warn md:px-8">

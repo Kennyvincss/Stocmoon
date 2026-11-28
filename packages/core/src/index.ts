@@ -4,4 +4,7 @@ export * from "./feeds";
 export * from "./markets";
 export * from "./config";
 export * from "./intraday";
+export * from "./indexer";
+export * from "./logs";
+export * from "./migrations";
 export * from "./abi/index";

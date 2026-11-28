@@ -6,6 +6,7 @@ import {
   oracleAdapterAbi, type IntradayHours,
   stocMoonMarketsAbi,
 } from "@stocmoon/core";
+import { fetchAllTokenizedStocks } from "@stocmoon/core";
 import { ROOT, deployment, env, isMain, log, operatorKey, optEnv, sleep } from "./lib/env";
 import { appClient, walletFor } from "./lib/clients";
 import { listMarkets, recycleLiquidity } from "./lib/ops";
@@ -17,7 +18,7 @@ import { listMarkets, recycleLiquidity } from "./lib/ops";
  *
  * Settings come from services/.env (see services/.env.example). During US trading hours (extended 04:00–20:00 ET by
  * default; INTRADAY_HOURS=regular for 09:30–16:00) it:
- *   1. publishes Alpaca IEX last-trade prices into each stock's intraday feed (every ~30s, plus a heartbeat)
+ *   1. publishes Alpaca IEX last-trade prices × the token multiplier into each stock's intraday feed (on change + heartbeat)
  *   2. opens 5m–4H UP/DOWN markets that close inside the same session
  *   3. settles expired intraday markets with round proofs (the contract verifies them)
  *   4. withdraws its seed liquidity from resolved markets so the USDC is reused
@@ -114,8 +115,27 @@ export async function setupIntraday() {
     lastTs[s] = round > 0n ? Number((await client.readContract({ address: cfg[s]!.feed, abi: mirrorAggregatorAbi, functionName: "latestRoundData" }))[3]) : 0;
   }
 
+  // Token price = share price × the token's multiplier (e.g. SNDK token = 8 shares), matching the Chainlink reference
+  // price and the rest of the site. Multipliers come from the Tokenized Stocks API, refreshed hourly.
+  const multipliers: Record<string, number> = {};
+  let multipliersAt = 0;
+  async function refreshMultipliers() {
+    if (Date.now() - multipliersAt < 3600_000 && Object.keys(multipliers).length) return;
+    try {
+      const { stocks } = await fetchAllTokenizedStocks({ baseUrl: optEnv("TOKENIZED_STOCKS_API_URL") });
+      for (const s of symbols) {
+        const st = stocks.find((x) => x.address.toLowerCase() === cfg[s]!.token.toLowerCase());
+        if (st?.multiplier && st.multiplier > 0) multipliers[s] = st.multiplier;
+      }
+      multipliersAt = Date.now();
+    } catch (e) {
+      log("operator", "multiplier refresh failed; keeping last known values", { error: (e as Error).message.slice(0, 120) });
+    }
+  }
+
   let warnedMissing = false;
   async function publishPrices(blockTs: number) {
+    await refreshMultipliers();
     const trades = await alpacaLatest(symbols);
     for (const [sym, tr] of Object.entries(trades)) lastTrade[sym] = tr.t;
     const missing = symbols.filter((s) => !trades[s]);
@@ -126,7 +146,9 @@ export async function setupIntraday() {
     for (const s of symbols) {
       const tr = trades[s];
       if (!tr) continue;
-      const answer = BigInt(Math.round(tr.p * 1e8));
+      const mult = multipliers[s];
+      if (!mult) continue; // never publish a share price where a token price is expected
+      const answer = BigInt(Math.round(tr.p * mult * 1e8));
       let updatedAt: number;
       const stale = blockTs - lastTs[s]! >= heartbeat;
       // publish on a price change, or on the heartbeat (keeps the feed fresh); saves gas across many stocks

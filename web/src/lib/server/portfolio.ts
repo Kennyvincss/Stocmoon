@@ -3,6 +3,7 @@ import { payoutFor, stocMoonLensAbi } from "@stocmoon/core";
 import { publicEnv } from "../public-env";
 import { chainClient } from "./chain";
 import { db } from "./db";
+import { marketEvents } from "./logs";
 import { listMarkets, type MarketView } from "./markets";
 
 export type Bucket = "open" | "pending" | "claimable" | "closed";
@@ -39,7 +40,7 @@ export interface PortfolioResponse {
   address: Address;
   positions: PositionView[];
   history: HistoryItem[];
-  historySource: "indexer" | "recent-logs" | "none";
+  historySource: "indexer" | "chain-events" | "none";
   realizedPnl: string | null;
   totals: { estimatedOpenValue: string; claimable: string; lpFees: string };
 }
@@ -76,31 +77,22 @@ async function historyFromDb(address: Address) {
 
 async function historyFromLogs(address: Address): Promise<HistoryItem[]> {
   if (!publicEnv.markets) return [];
-  const c = chainClient();
-  const latest = await c.getBlockNumber();
+  const [trades, redeems] = await Promise.all([marketEvents(TRADE, { trader: address }), marketEvents(REDEEMED, { account: address })]);
   const items: HistoryItem[] = [];
-  const span = 9_999n;
-  for (let to = latest, i = 0; i < 5 && to > 0n; i++, to -= span + 1n) {
-    const from = to > span ? to - span : 0n;
-    const [trades, redeems] = await Promise.all([
-      c.getLogs({ address: publicEnv.markets, event: TRADE, args: { trader: address }, fromBlock: from, toBlock: to }),
-      c.getLogs({ address: publicEnv.markets, event: REDEEMED, args: { account: address }, fromBlock: from, toBlock: to }),
-    ]);
-    for (const l of trades) {
-      items.push({
-        txHash: l.transactionHash, blockNumber: l.blockNumber.toString(), time: null, marketId: Number(l.args.marketId),
-        action: l.args.isBuy ? "buy" : "sell", side: l.args.isYes ? "YES" : "NO",
-        collateralIn: l.args.isBuy ? String(l.args.collateralAmount) : "0", collateralOut: l.args.isBuy ? "0" : String(l.args.collateralAmount),
-        shares: String(l.args.shares), fee: String(l.args.fee),
-      });
-    }
-    for (const l of redeems) {
-      items.push({
-        txHash: l.transactionHash, blockNumber: l.blockNumber.toString(), time: null, marketId: Number(l.args.marketId),
-        action: "redeem", side: null, collateralIn: "0", collateralOut: String(l.args.payout),
-        shares: String((l.args.yesBurned ?? 0n) + (l.args.noBurned ?? 0n)), fee: "0",
-      });
-    }
+  for (const l of trades) {
+    items.push({
+      txHash: l.transactionHash, blockNumber: l.blockNumber.toString(), time: null, marketId: Number(l.args.marketId),
+      action: l.args.isBuy ? "buy" : "sell", side: l.args.isYes ? "YES" : "NO",
+      collateralIn: l.args.isBuy ? String(l.args.collateralAmount) : "0", collateralOut: l.args.isBuy ? "0" : String(l.args.collateralAmount),
+      shares: String(l.args.shares), fee: String(l.args.fee),
+    });
+  }
+  for (const l of redeems) {
+    items.push({
+      txHash: l.transactionHash, blockNumber: l.blockNumber.toString(), time: null, marketId: Number(l.args.marketId),
+      action: "redeem", side: null, collateralIn: "0", collateralOut: String(l.args.payout),
+      shares: String((l.args.yesBurned ?? 0n) + (l.args.noBurned ?? 0n)), fee: "0",
+    });
   }
   return items.sort((a, b) => Number(BigInt(b.blockNumber) - BigInt(a.blockNumber)));
 }
@@ -161,7 +153,7 @@ export async function getPortfolio(address: Address): Promise<PortfolioResponse>
     realizedPnl = pnl.toString();
   } else {
     history = await historyFromLogs(address).catch(() => []);
-    historySource = history.length ? "recent-logs" : "none";
+    historySource = history.length ? "chain-events" : "none";
   }
 
   return {

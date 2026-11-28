@@ -7,7 +7,7 @@ import { publicEnv } from "../public-env";
 import { cached, invalidate } from "./cache";
 import { chainClient } from "./chain";
 import { db } from "./db";
-import { serverEnv } from "./env";
+import { marketEvents } from "./logs";
 import { getStocks, onchainRegistry, type OnchainAsset } from "./stocks";
 
 export interface AssetMeta {
@@ -117,9 +117,7 @@ async function eventDetails(): Promise<Map<number, { question: string; rulesURI:
         select market_id, question, rules_uri from earnings_events where chain_id = ${publicEnv.chainId}`;
       if (rows.length) return rows.map((x) => [Number(x.market_id), { question: x.question, rulesURI: x.rules_uri }] as const);
     }
-    const logs = await chainClient().getLogs({
-      address: publicEnv.markets, event: EVENT_DETAILS, fromBlock: serverEnv.deployBlock, toBlock: "latest",
-    });
+    const logs = await marketEvents(EVENT_DETAILS);
     return logs.map((l) => [Number(l.args.marketId), { question: l.args.question ?? "", rulesURI: l.args.rulesURI ?? "" }] as const);
   }).catch(() => ({ value: [] as (readonly [number, { question: string; rulesURI: string }])[] }));
   for (const [k, v] of r.value) out.set(k, v);

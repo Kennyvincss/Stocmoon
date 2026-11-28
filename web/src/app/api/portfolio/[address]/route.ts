@@ -1,6 +1,7 @@
 import { getAddress, isAddress } from "viem";
 import { getPortfolio } from "@/lib/server/portfolio";
 import { bad, json, rateLimit, serialize } from "@/lib/server/http";
+import { ensureIndexed } from "@/lib/server/sync";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +10,7 @@ export async function GET(_: Request, ctx: { params: Promise<{ address: string }
   if (limited) return limited;
   const { address } = await ctx.params;
   if (!isAddress(address, { strict: false })) return bad("Invalid address");
+  await ensureIndexed();
   try {
     return json(serialize(await getPortfolio(getAddress(address))));
   } catch (e) {

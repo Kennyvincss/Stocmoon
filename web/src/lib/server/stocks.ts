@@ -6,6 +6,7 @@ import { cached } from "./cache";
 import { chainClient } from "./chain";
 import { db } from "./db";
 import { serverEnv } from "./env";
+import { withSchema } from "./sync";
 
 export interface OnchainAsset {
   registered: boolean;
@@ -42,6 +43,7 @@ async function persist(stocks: TokenizedStock[], pages: number, skipped: number)
   const sql = db();
   if (!sql) return;
   try {
+    await withSchema();
     for (const s of stocks) {
       const raw = JSON.stringify(s);
       await sql`

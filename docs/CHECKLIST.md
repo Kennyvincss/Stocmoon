@@ -47,8 +47,13 @@ The build environment could not reach the Coinbase API or Base RPC, so live-netw
 - ✅ 20 TypeScript unit tests (API client, calendar, settlement search, formatting)
 - ✅ Local end-to-end: deploy → relay → keeper creates 5 markets → user trades → settlement → redeem → indexer → stats
 - ✅ Compliance flows verified: US blocked (451), signed attestation, nonce replay rejected, bad signature rejected
-- 🟡 Base Sepolia deployment — needs a funded deployer key (see README "Deploy")
-- 🟡 Basescan verification — `forge script ... --verify` with `ETHERSCAN_API_KEY`
+- ✅ Base Sepolia deployment (markets `0x2E53…0653`, oracle `0x4655…A1A3`, lens `0xd4eA…0a63`), 13 Chainlink mirrors + 13 intraday feeds
+- ✅ Basescan verification (all contracts verified)
+- ✅ Live at https://stocmoon.vercel.app (real Tokenized Stocks API data, live Alpaca chart, ticker)
+- ✅ Intraday 5m/15m/1H markets for all 13 stocks, extended hours, activity-gated; operator publishes token prices (× multiplier)
+- ✅ Leaderboard / history / profiles work on serverless: on-demand schema + indexing via Blockscout (Base RPC caps getLogs to 200 blocks)
+- 🟡 Always-on bot host — `pnpm bot` + `scripts/server/setup.sh` ready; needs a server (Railway / VPS) or a PC
+- 🟡 Database — free Supabase project + `DATABASE_URL` in Vercel
 - ⏳ External security audit (contracts are unaudited)
 - ⏳ Legal/compliance review before any real-money use
 

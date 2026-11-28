@@ -93,7 +93,7 @@ export default function PortfolioPage() {
 
       <Card>
         <CardHeader><CardTitle>Trading history</CardTitle>
-          <span className="text-xs text-muted">{d?.historySource === "recent-logs" ? "Recent blocks only (indexer not configured)" : ""}</span>
+          <span className="text-xs text-muted">{d?.historySource === "chain-events" ? "Read directly from chain events" : ""}</span>
         </CardHeader>
         <CardContent>
           {!d?.history.length ? <p className="text-sm text-muted">No transactions yet.</p> : (

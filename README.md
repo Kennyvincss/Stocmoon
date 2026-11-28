@@ -20,7 +20,10 @@ Built for the **Base Stocks Maxxing** hackathon, *Programmable Stock Markets* tr
 | Settlement | Permissionless: anyone submits the feed round in effect at close; the contract verifies it. Stale/unavailable price ⇒ INVALID (0.50/share) |
 | Stock Battles | Two stocks, higher **percentage** return wins (exact cross-multiplication onchain) |
 | Earnings markets | YES/NO with fixed public source, resolver + dispute window |
-| Portfolio & leaderboard | Positions read from chain; realised P&L, accuracy and rankings from indexed events only |
+| Intraday markets | 5m / 15m / 1H UP/DOWN markets for all 13 stocks in extended hours (04:00–20:00 ET), settled on Alpaca IEX prices published onchain by the operator (testnet trust assumption), only while a stock is actually trading |
+| Live chart & P&L | Moon-style candlestick chart (1s–1D) with live Alpaca prices × token multiplier; open P&L card with close-all |
+| Market ticker | Scrolling bar with US session status, live durations and every open market |
+| Portfolio & leaderboard | Positions read from chain; realised P&L, accuracy and rankings from indexed events only (indexed on demand — no separate indexer needed) |
 | Compliance | Geo-blocking (US + sanctioned by default), signed eligibility attestation, optional onchain allowlist |
 
 ## Repository layout
@@ -130,6 +133,18 @@ fixture tokens** (`FIXTA`, `FIXTB`, …) — never point a public deployment at 
 | contracts | `ETHERSCAN_API_KEY`, `USDC_ADDRESS`, `KEEPER_ADDRESS`, `RELAYER_ADDRESS`, `ENABLE_SHORT_DURATIONS` | See `contracts/.env.example` |
 
 Private keys live only in server/service environments — never in `NEXT_PUBLIC_*` variables or the repo.
+
+## Hosting the bots
+
+`pnpm bot` runs everything that has to happen on a schedule — the Chainlink price mirror, the 24H/7D keeper and the
+intraday operator — in one process with one wallet. It needs an always-on machine:
+
+- any computer: `pnpm bot` (settings in `services/.env`, see `services/server.env.example`)
+- a Linux server (Oracle Cloud, Hetzner, DigitalOcean…): `scripts/server/setup.sh` installs it as a service — see `docs/ORACLE.md`
+- GitHub Actions workflows exist as a manual backup only: GitHub starts scheduled runs hours late.
+
+The website needs no bot for its pages: with `DATABASE_URL` set (e.g. a free Supabase Postgres, transaction pooler
+URL), it creates its schema and indexes contract events on demand from the Blockscout API.
 
 ## API routes (web)
 

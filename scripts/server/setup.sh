@@ -24,7 +24,7 @@ cd "$DIR"
 pnpm install --frozen-lockfile --filter 'services...'
 
 if [ ! -f services/.env ]; then
-  cp services/.env.server.example services/.env
+  cp services/server.env.example services/.env
   echo "==> Created services/.env from the template"
 fi
 chmod 600 services/.env

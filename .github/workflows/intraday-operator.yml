@@ -5,11 +5,9 @@ name: Intraday operator (5m-4H markets)
 # group queues each run until the previous one exits, so only one operator runs at a time.
 # Covers ~07:55-01:25 UTC, i.e. 04:00-20:00 ET in both winter (EST) and summer (EDT) time.
 # Free for public repositories. Requires secrets: OPERATOR_PRIVATE_KEY, ALPACA_API_KEY_ID, ALPACA_API_SECRET.
+# NOTE: scheduled runs were removed — GitHub started them many hours late. The always-on bot (docs/ORACLE.md)
+# runs the intraday operator now; this workflow remains as a manual backup (Actions → Run workflow).
 on:
-  schedule:
-    - cron: "55 7 * * 1-5"
-    - cron: "40 13 * * 1-5"
-    - cron: "30 19 * * 1-5"
   workflow_dispatch:
     inputs:
       minutes:

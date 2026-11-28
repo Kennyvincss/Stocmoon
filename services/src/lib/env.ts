@@ -1,9 +1,21 @@
 import { readFileSync, existsSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Address, Hex } from "viem";
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../../..");
+
+// Every service reads its settings from services/.env when present (real environment variables take precedence).
+const ENV_FILE = join(ROOT, "services/.env");
+if (existsSync(ENV_FILE)) process.loadEnvFile(ENV_FILE);
+
+/** True when `metaUrl` is the script node was started with (lets modules double as CLI entry points). */
+export function isMain(metaUrl: string): boolean {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  const strip = (p: string) => p.replace(/\.[cm]?[jt]s$/, "");
+  return strip(resolve(entry)) === strip(fileURLToPath(metaUrl));
+}
 
 export function env(name: string, fallback?: string): string {
   const v = process.env[name] ?? fallback;
@@ -21,6 +33,12 @@ export function privateKey(name: string): Hex {
     throw new Error(`${name} is not a 32-byte hex private key (got ${v.length} characters; expected 64 hex digits, optionally prefixed with 0x)`);
   }
   return v as Hex;
+}
+
+/** The operator wallet key: OPERATOR_PRIVATE_KEY, or a legacy per-service variable. */
+export function operatorKey(...legacy: string[]): Hex {
+  for (const name of ["OPERATOR_PRIVATE_KEY", ...legacy]) if (process.env[name]) return privateKey(name);
+  throw new Error("Missing env OPERATOR_PRIVATE_KEY");
 }
 
 export interface DeploymentFile {

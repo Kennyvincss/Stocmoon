@@ -6,7 +6,7 @@ import {
   oracleAdapterAbi, type IntradayHours,
   stocMoonMarketsAbi,
 } from "@stocmoon/core";
-import { ROOT, deployment, env, log, optEnv, privateKey, sleep } from "./lib/env";
+import { ROOT, deployment, env, isMain, log, operatorKey, optEnv, sleep } from "./lib/env";
 import { appClient, walletFor } from "./lib/clients";
 import { listMarkets, recycleLiquidity } from "./lib/ops";
 
@@ -25,8 +25,6 @@ import { listMarkets, recycleLiquidity } from "./lib/ops";
  *
  * TESTNET trust assumption: the operator is the source of intraday prices (like the testnet Chainlink mirror).
  */
-const envFile = join(ROOT, "services/.env");
-if (existsSync(envFile)) process.loadEnvFile(envFile);
 
 interface IntradayEntry {
   token: Address;
@@ -58,7 +56,8 @@ async function alpacaLatest(symbols: string[]): Promise<Record<string, { p: numb
   return out;
 }
 
-async function main() {
+/** Sets up the intraday operator and returns one tick (publish prices when due, keeper work when due). */
+export async function setupIntraday() {
   const d = deployment();
   const client0 = appClient();
   // Discover intraday feeds from the chain: for every verified stock, check whether its intraday pseudo asset is
@@ -82,7 +81,7 @@ async function main() {
   const activityS = Number(env("INTRADAY_ACTIVITY_S", "900"));
   const lastTrade: Record<string, number> = {};
   const keeperEvery = Number(env("INTRADAY_KEEPER_INTERVAL_MS", "20000"));
-  const key = process.env.OPERATOR_PRIVATE_KEY ? privateKey("OPERATOR_PRIVATE_KEY") : privateKey("KEEPER_PRIVATE_KEY");
+  const key = operatorKey("KEEPER_PRIVATE_KEY");
   env("ALPACA_API_KEY_ID");
   env("ALPACA_API_SECRET");
 
@@ -194,34 +193,42 @@ async function main() {
 
   let lastPush = 0;
   let lastKeep = 0;
+  let announcedClosed = false;
+  const tick = async () => {
+    const blockTs = Number((await client.getBlock()).timestamp);
+    const open = inSession(Date.now());
+    if (!open && !announcedClosed) {
+      const next = nextIntradayOpen(Date.now(), HOURS);
+      log("operator", `US market closed: settling and recycling only (prices resume ${next ? formatEt(next) : "next trading day"})`, { hours: HOURS });
+    }
+    announcedClosed = !open;
+    if (open && Date.now() - lastPush >= pushEvery) {
+      lastPush = Date.now();
+      await publishPrices(blockTs);
+    }
+    if (Date.now() - lastKeep >= keeperEvery) {
+      lastKeep = Date.now();
+      await keeperTick(Number((await client.getBlock()).timestamp));
+    }
+  };
+  return { tick };
+}
+
+async function main() {
+  const op = await setupIntraday();
   let stop = false;
-  // optional maximum runtime (GitHub Actions jobs are limited to 6 hours)
+  // optional maximum runtime (e.g. CI jobs with a time limit)
   const maxRuntimeMin = Number(optEnv("OPERATOR_MAX_RUNTIME_MIN") ?? "0");
   const startedAt = Date.now();
   process.on("SIGINT", () => (stop = true));
   process.on("SIGTERM", () => (stop = true));
-  let announcedClosed = false;
   while (!stop) {
     if (maxRuntimeMin > 0 && Date.now() - startedAt > maxRuntimeMin * 60_000) {
-      log("operator", "max runtime reached; exiting so the next scheduled run can take over", { maxRuntimeMin });
+      log("operator", "max runtime reached; exiting", { maxRuntimeMin });
       break;
     }
     try {
-      const blockTs = Number((await client.getBlock()).timestamp);
-      const open = inSession(Date.now());
-      if (!open && !announcedClosed) {
-        const next = nextIntradayOpen(Date.now(), HOURS);
-        log("operator", `US market closed: settling and recycling only (prices resume ${next ? formatEt(next) : "next trading day"})`, { hours: HOURS });
-      }
-      announcedClosed = !open;
-      if (open && Date.now() - lastPush >= pushEvery) {
-        lastPush = Date.now();
-        await publishPrices(blockTs);
-      }
-      if (Date.now() - lastKeep >= keeperEvery) {
-        lastKeep = Date.now();
-        await keeperTick(Number((await client.getBlock()).timestamp));
-      }
+      await op.tick();
     } catch (e) {
       log("operator", "tick failed", { error: (e as Error).message.slice(0, 200) });
     }
@@ -231,7 +238,7 @@ async function main() {
   process.exit(0);
 }
 
-main().catch((e) => {
+if (isMain(import.meta.url)) main().catch((e) => {
   console.error(e instanceof Error ? e.message : e);
   process.exit(1);
 });

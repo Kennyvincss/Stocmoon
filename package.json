@@ -19,6 +19,7 @@
     "keeper": "pnpm --filter services keeper",
     "relayer": "pnpm --filter services relayer",
     "snapshotter": "pnpm --filter services snapshotter",
-    "operator": "pnpm --filter services operator"
+    "operator": "pnpm --filter services operator",
+    "bot": "pnpm --filter services bot"
   }
 }

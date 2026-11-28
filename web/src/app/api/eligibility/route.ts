@@ -8,6 +8,7 @@ import { chainClient } from "@/lib/server/chain";
 import { db } from "@/lib/server/db";
 import { verifySigned } from "@/lib/server/signed";
 import { publicEnv } from "@/lib/public-env";
+import { withSchema } from "@/lib/server/sync";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +48,7 @@ export async function GET(req: Request) {
   const g = await geo();
   let attested = false;
   const sql = db();
+  if (sql) await withSchema().catch(() => {});
   if (sql && address) {
     const rows = await sql`select 1 from eligibility_attestations where address = ${address.toLowerCase()} limit 1`;
     attested = rows.length > 0;

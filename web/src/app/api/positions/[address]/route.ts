@@ -3,7 +3,7 @@ import { stocMoonLensAbi } from "@stocmoon/core";
 import { listMarkets } from "@/lib/server/markets";
 import { chainClient } from "@/lib/server/chain";
 import { cached } from "@/lib/server/cache";
-import { serverEnv } from "@/lib/server/env";
+import { marketEvents } from "@/lib/server/logs";
 import { bad, json, rateLimit, serialize } from "@/lib/server/http";
 import { publicEnv } from "@/lib/public-env";
 
@@ -12,28 +12,18 @@ export const dynamic = "force-dynamic";
 const TRADE = parseAbiItem(
   "event Trade(uint256 indexed marketId, address indexed trader, bool indexed isYes, bool isBuy, uint256 collateralAmount, uint256 shares, uint256 fee, uint256 poolYes, uint256 poolNo)",
 );
-const CHUNK = 9_999n;
-const MAX_SPAN = 1_400_000n; // ~32 days of Base blocks: covers the longest (30D) market
-
 /** Net USDC paid / received per (market, side) by `trader`, from onchain Trade events. */
 async function flows(trader: Address) {
   const r = await cached(`flows:${trader.toLowerCase()}`, 15_000, async () => {
-    const c = chainClient();
-    const latest = await c.getBlockNumber();
-    const start = latest > MAX_SPAN && latest - MAX_SPAN > serverEnv.deployBlock ? latest - MAX_SPAN : serverEnv.deployBlock;
     const out: Record<string, { paid: string; received: string }> = {};
-    const add = (k: string, paid: bigint, received: bigint) => {
+    for (const l of await marketEvents(TRADE, { trader })) {
+      const k = `${l.args.marketId}:${l.args.isYes ? "YES" : "NO"}`;
+      const amt = l.args.collateralAmount ?? 0n;
       const cur = out[k] ?? { paid: "0", received: "0" };
-      out[k] = { paid: (BigInt(cur.paid) + paid).toString(), received: (BigInt(cur.received) + received).toString() };
-    };
-    for (let from = start; from <= latest; from += CHUNK + 1n) {
-      const to = from + CHUNK > latest ? latest : from + CHUNK;
-      const logs = await c.getLogs({ address: publicEnv.markets!, event: TRADE, args: { trader }, fromBlock: from, toBlock: to });
-      for (const l of logs) {
-        const k = `${l.args.marketId}:${l.args.isYes ? "YES" : "NO"}`;
-        const amt = l.args.collateralAmount ?? 0n;
-        add(k, l.args.isBuy ? amt : 0n, l.args.isBuy ? 0n : amt);
-      }
+      out[k] = {
+        paid: (BigInt(cur.paid) + (l.args.isBuy ? amt : 0n)).toString(),
+        received: (BigInt(cur.received) + (l.args.isBuy ? 0n : amt)).toString(),
+      };
     }
     return out;
   });

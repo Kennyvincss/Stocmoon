@@ -3,7 +3,9 @@
   "private": true,
   "version": "0.1.0",
   "packageManager": "pnpm@10.28.0",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "pnpm --filter web dev",
     "build": "pnpm --filter web build",
@@ -20,6 +22,7 @@
     "relayer": "pnpm --filter services relayer",
     "snapshotter": "pnpm --filter services snapshotter",
     "operator": "pnpm --filter services operator",
-    "bot": "pnpm --filter services bot"
+    "bot": "pnpm --filter services bot",
+    "migrations": "node packages/core/scripts/export-migrations.mjs"
   }
 }

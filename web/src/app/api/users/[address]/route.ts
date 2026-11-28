@@ -2,6 +2,7 @@ import { isAddress } from "viem";
 import { bad, json, rateLimit } from "@/lib/server/http";
 import { db } from "@/lib/server/db";
 import { userStats } from "@/lib/server/leaderboard";
+import { ensureIndexed } from "@/lib/server/sync";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,7 @@ export async function GET(_: Request, ctx: { params: Promise<{ address: string }
   if (!isAddress(address, { strict: false })) return bad("Invalid address");
   const sql = db();
   if (!sql) return json({ profile: null, stats: null, available: false });
+  await ensureIndexed();
   const [p] = await sql<{ username: string | null; avatar_url: string | null }[]>`
     select username, avatar_url from users where address = ${address.toLowerCase()}`;
   return json({

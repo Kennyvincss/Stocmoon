@@ -4,6 +4,7 @@ import { bad, json, rateLimit } from "@/lib/server/http";
 import { db } from "@/lib/server/db";
 import { verifySigned } from "@/lib/server/signed";
 import { PROFILE_MESSAGE } from "@/lib/messages";
+import { withSchema } from "@/lib/server/sync";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,7 @@ export async function GET(req: Request) {
   if (!address || !isAddress(address, { strict: false })) return bad("Invalid address");
   const sql = db();
   if (!sql) return json({ profile: null, available: false });
+  await withSchema();
   const [row] = await sql<{ username: string | null; avatar_url: string | null }[]>`
     select username, avatar_url from users where address = ${address.toLowerCase()}`;
   return json({ profile: row ? { username: row.username, avatarUrl: row.avatar_url } : null, available: true });
@@ -33,6 +35,7 @@ export async function POST(req: Request) {
   if (limited) return limited;
   const sql = db();
   if (!sql) return bad("Profiles need the database (DATABASE_URL) to be configured", 503);
+  await withSchema();
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return bad(parsed.error.issues[0]?.message ?? "Invalid request");
   const { username, avatarUrl, nonce, issuedAt, signature } = parsed.data;

@@ -3,7 +3,7 @@ import {
   canScheduleMarket, findSettlementProof, mirrorAggregatorAbi, normalizeMarket, oracleAdapterAbi, stocMoonLensAbi, stocMoonMarketsAbi,
   type MarketData, type RawMarket,
 } from "@stocmoon/core";
-import { deployment, env, log, loop, optEnv, privateKey } from "./lib/env";
+import { deployment, env, isMain, log, loop, operatorKey, optEnv } from "./lib/env";
 import { appClient, walletFor } from "./lib/clients";
 import { recycleLiquidity } from "./lib/ops";
 
@@ -15,17 +15,17 @@ import { recycleLiquidity } from "./lib/ops";
  *  - finalizes event-market proposals after the dispute window
  * The keeper has MARKET_CREATOR_ROLE only; it cannot change existing markets.
  */
-const DURATIONS = (optEnv("KEEPER_DURATIONS") ?? "86400,604800").split(",").map(Number);
-const LIQUIDITY = BigInt(env("KEEPER_LIQUIDITY", "50000000")); // 50 USDC
-const BATTLES = (optEnv("KEEPER_BATTLES") ?? "").split(",").filter(Boolean).map((s) => {
-  const [a, b, dur] = s.split(":");
-  return { a: getAddress(a!.toLowerCase()) as Address, b: getAddress(b!.toLowerCase()) as Address, duration: Number(dur) };
-});
-
-async function main() {
+/** Sets up the 24H/7D keeper and returns one tick (create, settle, recycle). */
+export async function setupKeeper() {
+  const DURATIONS = (optEnv("KEEPER_DURATIONS") ?? "86400,604800").split(",").map(Number);
+  const LIQUIDITY = BigInt(env("KEEPER_LIQUIDITY", "10000000")); // 10 USDC
+  const BATTLES = (optEnv("KEEPER_BATTLES") ?? "").split(",").filter(Boolean).map((s) => {
+    const [a, b, dur] = s.split(":");
+    return { a: getAddress(a!.toLowerCase()) as Address, b: getAddress(b!.toLowerCase()) as Address, duration: Number(dur) };
+  });
   const d = deployment();
   const client = appClient();
-  const wallet = walletFor(privateKey("KEEPER_PRIVATE_KEY"));
+  const wallet = walletFor(operatorKey("KEEPER_PRIVATE_KEY"));
   const me = wallet.account.address;
   const send = async (functionName: string, args: readonly unknown[]) => {
     const { request } = await client.simulateContract({ address: d.markets, abi: stocMoonMarketsAbi, functionName: functionName as never, args: args as never, account: wallet.account });
@@ -42,7 +42,7 @@ async function main() {
     log("keeper", "approved collateral", { tx: hash });
   }
 
-  await loop("keeper", Number(env("KEEPER_INTERVAL_MS", "30000")), async () => {
+  const tick = async () => {
     // chain time is what the contract enforces
     const now = Number((await client.getBlock()).timestamp);
     const count = Number(await client.readContract({ address: d.markets, abi: stocMoonMarketsAbi, functionName: "marketCount" }));
@@ -121,10 +121,16 @@ async function main() {
       if (!canScheduleMarket(now * 1000, (now + bt.duration) * 1000) || budget < LIQUIDITY) continue;
       if (await send("createBattleMarket", [bt.a, bt.b, bt.duration, LIQUIDITY]).catch((e) => (log("keeper", "battle create failed", { error: (e as Error).message.slice(0, 200) }), false))) budget -= LIQUIDITY;
     }
-  });
+  };
+  return { tick };
 }
 
-main().catch((e) => {
+async function main() {
+  const k = await setupKeeper();
+  await loop("keeper", Number(env("KEEPER_INTERVAL_MS", "30000")), k.tick);
+}
+
+if (isMain(import.meta.url)) main().catch((e) => {
   console.error(e);
   process.exit(1);
 });

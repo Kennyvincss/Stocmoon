@@ -12,6 +12,7 @@
     "snapshotter": "tsx src/snapshotter.ts",
     "create-event": "tsx src/create-event.ts",
     "operator": "tsx src/operator.ts",
+    "bot": "tsx src/bot.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },

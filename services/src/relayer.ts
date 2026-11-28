@@ -1,6 +1,6 @@
 import type { Address, PublicClient } from "viem";
 import { aggregatorV3Abi, getRound, mirrorAggregatorAbi, oracleAdapterAbi } from "@stocmoon/core";
-import { deployment, env, log, loop, privateKey } from "./lib/env";
+import { deployment, env, isMain, log, loop, operatorKey } from "./lib/env";
 import { appClient, sourceClient, walletFor } from "./lib/clients";
 import { db } from "./lib/db";
 
@@ -33,15 +33,16 @@ async function discoverMirrors(client: PublicClient, oracle: Address): Promise<M
 
 const lastSeen = new Map<string, bigint>();
 
-async function main() {
+/** Sets up the testnet Chainlink mirror relayer and returns one tick. */
+export async function setupRelayer() {
   const d = deployment();
   const app = appClient();
   const src = sourceClient();
-  const wallet = walletFor(privateKey("RELAYER_PRIVATE_KEY"));
+  const wallet = walletFor(operatorKey("RELAYER_PRIVATE_KEY"));
   const mirrors = await discoverMirrors(app, d.oracleAdapter);
   log("relayer", "mirrors", { count: mirrors.length, relayer: wallet.account.address });
 
-  await loop("relayer", Number(env("RELAYER_INTERVAL_MS", "20000")), async () => {
+  const tick = async () => {
     for (const m of mirrors) {
       const [lastSource, latest] = await Promise.all([
         app.readContract({ address: m.mirror, abi: mirrorAggregatorAbi, functionName: "lastSourceRoundId" }),
@@ -86,10 +87,16 @@ async function main() {
         }
       }
     }
-  });
+  };
+  return { tick };
 }
 
-main().catch((e) => {
+async function main() {
+  const r = await setupRelayer();
+  await loop("relayer", Number(env("RELAYER_INTERVAL_MS", "20000")), r.tick);
+}
+
+if (isMain(import.meta.url)) main().catch((e) => {
   console.error(e);
   process.exit(1);
 });
